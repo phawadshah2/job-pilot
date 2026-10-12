@@ -1,0 +1,27 @@
+{
+  "first_name": "Alex",
+  "last_name": "Doe",
+  "full_name": "Alex Doe",
+  "email": "alex.doe@example.com",
+  "phone": "+971 50 000 0000",
+  "city": "Dubai",
+  "country": "United Arab Emirates",
+  "address": null,
+  "postcode": null,
+  "linkedin": "https://linkedin.com/in/alex-doe-example",
+  "github": "https://github.com/alex-doe-example",
+  "portfolio": null,
+  "current_company": "Acme Shop",
+  "current_title": "Senior Flutter Developer",
+  "years_experience": "6",
+  "notice_period": "1 month",
+  "salary_current": null,
+  "salary_expected": null,
+  "nationality": null,
+  "visa_status": null,
+  "relocate": null,
+  "how_heard": "Job board",
+  "answers": {
+    "_note": "Exact question text -> answer, reused on every application."
+  }
+}

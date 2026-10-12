@@ -1,0 +1,478 @@
+{
+  "_why": "Generic defaults for everyone. Personal choices (role, regions, skills, companies) come from ~/.job-pilot/user.json via `jobpilot setup`.",
+  "follow_up_days": 7,
+  "sources": {
+    "himalayas": true,
+    "remotive": true,
+    "remoteok": true,
+    "jobicy": true,
+    "greenhouse": true,
+    "lever": true,
+    "ashby": true,
+    "workable": true,
+    "smartrecruiters": true,
+    "jsearch": true,
+    "gmail": true
+  },
+  "jsearch": {
+    "date_posted": "week",
+    "monthly_budget": 190,
+    "exclude_publishers": [
+      "USA Remote Jobs MySmartPros",
+      "Remote Jobs USA",
+      "Remote Quest Jobs",
+      "HireClip"
+    ]
+  },
+  "gmail": {
+    "_why": "Job-alert emails read over IMAP with GMAIL_ADDRESS + GMAIL_APP_PASSWORD from .env; processed alerts are marked read.",
+    "query": "newer_than:7d is:unread (from:jobalert.indeed.com OR from:jobalerts-noreply@linkedin.com OR from:bayt.com OR from:gulftalent.com OR from:naukrigulf.com)"
+  },
+  "blocklist": {
+    "_why": "Reposting/spam feeds seen in JSearch results (2026-10-11). Substring match, case-insensitive. `jobpilot clean` re-applies it to stored New jobs.",
+    "companies": [
+      "vmysmartpros",
+      "remotepromsp",
+      "remote quest jobs",
+      "hireclip"
+    ],
+    "sources": [
+      "mysmartpros",
+      "remote jobs usa",
+      "remote quest jobs",
+      "hireclip"
+    ],
+    "url_patterns": [
+      "mysmartpros\\.com",
+      "dedyn\\.io",
+      "10001mb\\.com"
+    ]
+  },
+  "find": {
+    "prepare_top": 12,
+    "prepare_min_score": 70,
+    "email_jd_lookups": 6
+  },
+  "region_catalog": {
+    "_why": "Regions a user can pick (in priority order) during `jobpilot setup`. patterns = location words; jsearch = searches run for that region.",
+    "uae": {
+      "name": "United Arab Emirates",
+      "patterns": [
+        "uae",
+        "u.a.e",
+        "united arab emirates",
+        "emirates",
+        "dubai",
+        "abu dhabi",
+        "sharjah",
+        "ajman",
+        "ras al khaimah",
+        "fujairah",
+        "al ain",
+        "ae",
+        "دبي",
+        "الشارقة",
+        "أبو ظبي",
+        "ابوظبي",
+        "عجمان",
+        "رأس الخيمة",
+        "الفجيرة",
+        "العين",
+        "الإمارات"
+      ],
+      "jsearch": [
+        {
+          "place": "United Arab Emirates",
+          "country": "ae"
+        },
+        {
+          "place": "Dubai",
+          "country": "ae"
+        },
+        {
+          "place": "Abu Dhabi",
+          "country": "ae"
+        }
+      ]
+    },
+    "gcc": {
+      "name": "GCC (Saudi Arabia, Qatar, Kuwait, Bahrain, Oman)",
+      "patterns": [
+        "saudi",
+        "saudi arabia",
+        "ksa",
+        "riyadh",
+        "jeddah",
+        "dammam",
+        "khobar",
+        "al khobar",
+        "makkah",
+        "mecca",
+        "madinah",
+        "medina",
+        "neom",
+        "dhahran",
+        "qatar",
+        "doha",
+        "kuwait",
+        "bahrain",
+        "manama",
+        "oman",
+        "muscat",
+        "gcc",
+        "sa",
+        "qa",
+        "kw",
+        "bh",
+        "om",
+        "الرياض",
+        "جدة",
+        "الدمام",
+        "الخبر",
+        "مكة",
+        "المدينة المنورة",
+        "السعودية",
+        "الدوحة",
+        "قطر",
+        "الكويت",
+        "البحرين",
+        "المنامة",
+        "عمان",
+        "مسقط"
+      ],
+      "jsearch": [
+        {
+          "place": "Saudi Arabia",
+          "country": "sa"
+        },
+        {
+          "place": "Qatar",
+          "country": "qa"
+        },
+        {
+          "place": "Kuwait",
+          "country": "kw"
+        },
+        {
+          "place": "Bahrain",
+          "country": "bh"
+        },
+        {
+          "place": "Oman",
+          "country": "om"
+        }
+      ]
+    },
+    "uk": {
+      "name": "United Kingdom",
+      "patterns": [
+        "united kingdom",
+        "uk",
+        "u.k.",
+        "england",
+        "scotland",
+        "wales",
+        "britain",
+        "london",
+        "manchester",
+        "birmingham",
+        "edinburgh",
+        "glasgow",
+        "leeds",
+        "bristol",
+        "cambridge",
+        "oxford",
+        "gb"
+      ],
+      "jsearch": [
+        {
+          "place": "United Kingdom",
+          "country": "gb"
+        }
+      ]
+    },
+    "us": {
+      "name": "United States",
+      "patterns": [
+        "united states",
+        "usa",
+        "u.s.",
+        "us",
+        "new york",
+        "san francisco",
+        "california",
+        "texas",
+        "florida",
+        "seattle",
+        "boston",
+        "chicago",
+        "austin",
+        "atlanta",
+        "denver",
+        "los angeles",
+        "washington",
+        "new jersey",
+        "virginia",
+        "north carolina"
+      ],
+      "jsearch": [
+        {
+          "place": "United States",
+          "country": "us"
+        }
+      ]
+    },
+    "au": {
+      "name": "Australia",
+      "patterns": [
+        "australia",
+        "sydney",
+        "melbourne",
+        "brisbane",
+        "perth",
+        "adelaide",
+        "canberra",
+        "nsw",
+        "victoria",
+        "queensland",
+        "au"
+      ],
+      "jsearch": [
+        {
+          "place": "Australia",
+          "country": "au"
+        }
+      ]
+    },
+    "ca": {
+      "name": "Canada",
+      "patterns": [
+        "canada",
+        "toronto",
+        "vancouver",
+        "montreal",
+        "ottawa",
+        "calgary",
+        "ontario",
+        "british columbia",
+        "ca"
+      ],
+      "jsearch": [
+        {
+          "place": "Canada",
+          "country": "ca"
+        }
+      ]
+    },
+    "eu": {
+      "name": "Europe (EU)",
+      "patterns": [
+        "germany",
+        "berlin",
+        "munich",
+        "netherlands",
+        "amsterdam",
+        "france",
+        "paris",
+        "spain",
+        "madrid",
+        "barcelona",
+        "ireland",
+        "dublin",
+        "sweden",
+        "stockholm",
+        "poland",
+        "warsaw",
+        "portugal",
+        "lisbon",
+        "italy",
+        "milan",
+        "austria",
+        "vienna",
+        "belgium",
+        "denmark",
+        "copenhagen",
+        "finland",
+        "helsinki",
+        "czech",
+        "prague",
+        "europe",
+        "eu"
+      ],
+      "jsearch": [
+        {
+          "place": "Germany",
+          "country": "de"
+        },
+        {
+          "place": "Netherlands",
+          "country": "nl"
+        },
+        {
+          "place": "Ireland",
+          "country": "ie"
+        }
+      ]
+    },
+    "in": {
+      "name": "India",
+      "patterns": [
+        "india",
+        "bangalore",
+        "bengaluru",
+        "hyderabad",
+        "pune",
+        "chennai",
+        "mumbai",
+        "delhi",
+        "noida",
+        "gurgaon",
+        "gurugram",
+        "in",
+        "jaipur",
+        "gandhinagar",
+        "ahmedabad",
+        "kolkata",
+        "kochi",
+        "chandigarh",
+        "indore",
+        "coimbatore"
+      ],
+      "jsearch": [
+        {
+          "place": "India",
+          "country": "in"
+        }
+      ]
+    },
+    "pk": {
+      "name": "Pakistan",
+      "patterns": [
+        "pakistan",
+        "lahore",
+        "karachi",
+        "islamabad",
+        "rawalpindi",
+        "peshawar",
+        "pk"
+      ],
+      "jsearch": [
+        {
+          "place": "Pakistan",
+          "country": "pk"
+        }
+      ]
+    },
+    "eg": {
+      "name": "Egypt",
+      "patterns": [
+        "egypt",
+        "cairo",
+        "alexandria",
+        "giza",
+        "eg"
+      ],
+      "jsearch": [
+        {
+          "place": "Egypt",
+          "country": "eg"
+        }
+      ]
+    },
+    "sg": {
+      "name": "Singapore",
+      "patterns": [
+        "singapore",
+        "sg"
+      ],
+      "jsearch": [
+        {
+          "place": "Singapore",
+          "country": "sg"
+        }
+      ]
+    },
+    "nz": {
+      "name": "New Zealand",
+      "patterns": [
+        "new zealand",
+        "auckland",
+        "wellington",
+        "nz"
+      ],
+      "jsearch": [
+        {
+          "place": "New Zealand",
+          "country": "nz"
+        }
+      ]
+    }
+  },
+  "filters": {
+    "max_age_days": 21,
+    "title_exclude_any": [
+      "junior",
+      "jr",
+      "intern",
+      "internship",
+      "trainee",
+      "graduate",
+      "entry level",
+      "teacher",
+      "tutor",
+      "instructor",
+      "sales",
+      "recruiter"
+    ],
+    "senior_markers": [
+      "senior",
+      "sr",
+      "lead",
+      "staff",
+      "principal",
+      "head",
+      "architect",
+      "expert",
+      "iii",
+      "sde 3",
+      "sde-3"
+    ],
+    "worldwide_markers": [
+      "worldwide",
+      "anywhere",
+      "global",
+      "globally",
+      "international"
+    ],
+    "languages": [
+      "arabic",
+      "german",
+      "french",
+      "dutch",
+      "spanish",
+      "italian",
+      "portuguese",
+      "japanese",
+      "mandarin",
+      "chinese",
+      "korean",
+      "turkish",
+      "russian",
+      "hebrew",
+      "polish",
+      "swedish",
+      "norwegian",
+      "danish",
+      "finnish",
+      "urdu",
+      "hindi"
+    ],
+    "dealbreakers": {
+      "citizenship / clearance required": [
+        "re:\\b(us|u\\.s\\.)\\s+citizen(s|ship)?\\b",
+        "re:security clearance",
+        "re:green card holders? only"
+      ]
+    }
+  }
+}

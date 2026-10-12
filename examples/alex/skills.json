@@ -1,0 +1,232 @@
+{
+  "have": {
+    "Flutter": [
+      "flutter"
+    ],
+    "Dart": [
+      "dart"
+    ],
+    "iOS": [
+      "ios"
+    ],
+    "Android": [
+      "android"
+    ],
+    "Cross-platform": [
+      "cross-platform",
+      "cross platform"
+    ],
+    "BLoC": [
+      "bloc",
+      "cubit"
+    ],
+    "Provider": [
+      "re:\\bprovider\\b(?=\\s*[,/)]|\\s+(?:or|and|state|package|pattern)\\b)",
+      "re:\\b(?:bloc|riverpod|getx|cubit)\\b[^.\\n]{0,40}\\bprovider\\b"
+    ],
+    "Riverpod": [
+      "riverpod"
+    ],
+    "State management": [
+      "state management"
+    ],
+    "Clean Architecture": [
+      "clean architecture"
+    ],
+    "MVVM": [
+      "mvvm"
+    ],
+    "Repository pattern": [
+      "repository pattern"
+    ],
+    "Dependency injection": [
+      "dependency injection"
+    ],
+    "SOLID": [
+      "solid principles",
+      "cs:\\bSOLID\\b"
+    ],
+    "OOP": [
+      "oop",
+      "object-oriented",
+      "object oriented"
+    ],
+    "RESTful APIs": [
+      "restful",
+      "re:\\brest\\s*(?:apis?|services?|endpoints?|interfaces?)\\b",
+      "cs:\\bREST\\b"
+    ],
+    "JSON": [
+      "json"
+    ],
+    "OAuth 2.0": [
+      "oauth",
+      "oauth2",
+      "oauth 2.0"
+    ],
+    "Firebase": [
+      "firebase",
+      "firestore",
+      "crashlytics",
+      "fcm",
+      "cloud messaging"
+    ],
+    "Push notifications": [
+      "push notification",
+      "push notifications"
+    ],
+    "Unit testing": [
+      "unit test",
+      "unit tests",
+      "unit testing"
+    ],
+    "Widget testing": [
+      "widget test",
+      "widget tests",
+      "widget testing"
+    ],
+    "Integration testing": [
+      "integration test",
+      "integration tests",
+      "integration testing"
+    ],
+    "CI/CD": [
+      "ci/cd",
+      "ci / cd",
+      "continuous integration",
+      "continuous delivery"
+    ],
+    "GitHub Actions": [
+      "github actions"
+    ],
+    "Git": [
+      "git",
+      "github",
+      "version control"
+    ],
+    "Agile/Scrum": [
+      "agile",
+      "scrum"
+    ],
+    "Jira": [
+      "jira"
+    ],
+    "Figma": [
+      "figma"
+    ],
+    "UI/UX": [
+      "ui/ux",
+      "ux",
+      "user experience",
+      "material design",
+      "cupertino"
+    ],
+    "Animations": [
+      "animation",
+      "animations",
+      "rive",
+      "lottie"
+    ],
+    "Google Maps": [
+      "google maps",
+      "maps sdk"
+    ],
+    "Payments": [
+      "payment gateway",
+      "payment integration",
+      "payments integration",
+      "stripe",
+      "apple pay",
+      "google pay",
+      "tabby",
+      "tamara",
+      "fintech",
+      "in-app purchase"
+    ],
+    "Performance optimization": [
+      "performance optimization",
+      "performance tuning",
+      "profiling",
+      "devtools"
+    ],
+    "App Store / Play Store releases": [
+      "app store",
+      "play store",
+      "google play",
+      "testflight"
+    ],
+    "Code review": [
+      "code review",
+      "code reviews"
+    ],
+    "Mentoring": [
+      "mentor",
+      "mentoring",
+      "mentorship"
+    ],
+    "Python": [
+      "python"
+    ],
+    "SQL": [
+      "sql"
+    ]
+  },
+  "gap": {
+    "React Native": [
+      "react native"
+    ],
+    "JavaScript": [
+      "javascript",
+      "cs:\\bJS\\b"
+    ],
+    "TypeScript": [
+      "typescript"
+    ],
+    "GraphQL": [
+      "graphql"
+    ],
+    "Docker": [
+      "docker",
+      "kubernetes"
+    ],
+    "Azure": [
+      "azure",
+      "app center",
+      "application insights"
+    ],
+    "Fastlane": [
+      "fastlane"
+    ]
+  },
+  "unverified": {
+    "Swift": [
+      "swift",
+      "swiftui"
+    ],
+    "Kotlin": [
+      "kotlin",
+      "jetpack compose"
+    ],
+    "Flutter Web": [
+      "flutter web"
+    ]
+  },
+  "forbidden_in_cv": {
+    "patterns": [
+      "react native",
+      "javascript",
+      "\\bJS\\b",
+      "typescript",
+      "graphql",
+      "docker",
+      "kubernetes",
+      "azure",
+      "app center",
+      "application insights",
+      "fastlane"
+    ],
+    "allowed_phrases": {
+      "typescript": "typescript-comparable"
+    }
+  }
+}

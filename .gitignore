@@ -1,0 +1,13 @@
+.env
+/data/
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+# personal data belongs in ~/.job-pilot; never commit copies that end up in the repo root
+/applicant.json
+/user.json
+/skills.json
+/cv.json
+/facts.md
+/jobs/

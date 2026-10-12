@@ -1,0 +1,80 @@
+{
+  "name": "Alex Doe",
+  "about": {
+    "email": "alex.doe@example.com",
+    "phone": "+971 50 000 0000",
+    "city": "Dubai",
+    "country": "UAE",
+    "linkedin": "https://linkedin.com/in/alex-doe-example",
+    "github": "https://github.com/alex-doe-example",
+    "portfolio": ""
+  },
+  "role": {
+    "target_title": "Senior Flutter Developer",
+    "search_title": "flutter developer",
+    "keywords": [
+      "flutter",
+      "dart"
+    ],
+    "related_titles": [
+      "mobile",
+      "mobile app",
+      "cross-platform",
+      "cross platform",
+      "app developer",
+      "app engineer"
+    ],
+    "competing_stacks": [
+      "react native",
+      "ionic",
+      "xamarin",
+      "kotlin multiplatform"
+    ],
+    "exclude_title_stacks": [
+      "unity",
+      "sap",
+      "servicenow",
+      "maui",
+      "rust",
+      "react.js",
+      "angular",
+      "flutter flow",
+      "flutterflow"
+    ],
+    "seniority": "senior",
+    "career_start": "2020-03"
+  },
+  "search": {
+    "regions": [
+      "uae",
+      "gcc",
+      "remote",
+      "uk",
+      "us",
+      "au"
+    ],
+    "home_country": "ae",
+    "remote_ok": [
+      "emea",
+      "mena",
+      "middle east",
+      "gulf",
+      "gmt+4"
+    ],
+    "languages": [
+      "english"
+    ],
+    "salary_floor": {
+      "currency": "AED",
+      "per_month": 9000
+    },
+    "us_citizen": false,
+    "companies": {
+      "greenhouse": [],
+      "lever": [],
+      "ashby": [],
+      "workable": [],
+      "smartrecruiters": []
+    }
+  }
+}

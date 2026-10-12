@@ -1,0 +1,54 @@
+  /* job-pilot default CV design: US Letter, 1in margins, navy headings, Inter body.
+     Rendered by jobpilot/cv/render.py; tailoring never changes it. */
+  @page { size: Letter; margin: 72pt 72pt 60pt 72pt; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: Inter, Arial, sans-serif; font-size: 10pt; color: #000; -webkit-font-smoothing: antialiased; }
+
+  .name     { font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 20pt; color: #1F3864;
+              text-align: center; margin: 0; line-height: 1.1; letter-spacing: 0.2pt; }
+  .headline { font-family: Arial, Helvetica, sans-serif; font-size: 12pt; color: #404040;
+              text-align: center; margin: 1pt 0 2pt; line-height: 1.15; }
+  .contact  { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; color: #000;
+              text-align: center; margin: 0; line-height: 1.25; }
+  .sep      { padding: 0 4pt; }
+
+  h2 { font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 12pt; color: #1F3864;
+       margin: 11pt 0 5pt; padding-bottom: 2pt; border-bottom: 1pt solid #1F3864; line-height: 1.1;
+       letter-spacing: 0.1pt; break-after: avoid; page-break-after: avoid; }
+
+  .summary { font-size: 11pt; line-height: 1.22; margin: 0; }
+
+  .skill   { font-size: 11pt; line-height: 1.21; margin: 0; }
+  .skill b { font-weight: 700; }
+
+  .job { display: flex; justify-content: space-between; align-items: baseline; margin: 8pt 0 7pt;
+         font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.15;
+         break-after: avoid; page-break-after: avoid; }
+  h2 + .job { margin-top: 2pt; }
+  .job .title { font-weight: 700; }
+  .job .dates { font-size: 10pt; color: #595959; white-space: nowrap; padding-right: 14pt; }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  ul.exp li { position: relative; padding-left: 36pt; font-size: 10pt; line-height: 1.22;
+              break-inside: avoid; page-break-inside: avoid; }
+  ul.exp li::before { content: "\25CF"; position: absolute; left: 18pt; top: 0.5pt;
+                      font-family: Arial, sans-serif; font-size: 9pt; color: #595959; }
+
+  .proj { font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 11pt; line-height: 1.15;
+          margin: 8pt 0 2pt; break-after: avoid; page-break-after: avoid; }
+  h2 + .proj { margin-top: 0; }
+  .proj .meta { font-weight: 400; color: #595959; }
+  .tech { font-family: Arial, Helvetica, sans-serif; font-style: italic; font-size: 10pt; color: #404040;
+          line-height: 1.12; margin: 0 0 2pt; break-after: avoid; page-break-after: avoid; }
+  .tech b { font-weight: 700; color: #000; }
+  ul.proj-points li { position: relative; padding-left: 18pt; font-size: 10pt; line-height: 1.25;
+                      margin-bottom: 1.5pt; break-inside: avoid; page-break-inside: avoid; }
+  ul.proj-points li::before { content: "\2022"; position: absolute; left: 7pt; top: 0;
+                              font-family: Arial, sans-serif; font-size: 9.5pt; }
+
+  .edu { display: flex; justify-content: space-between; align-items: baseline; margin: 0;
+         font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.15; }
+  .edu .degree { font-weight: 700; }
+  .edu .dates  { font-size: 10pt; color: #595959; padding-right: 14pt; }
+  .school { font-size: 10pt; line-height: 1.25; margin: 2pt 0 0; }

@@ -1,0 +1,538 @@
+{
+  "_note": "Known skills and how job descriptions name them. `jobpilot setup` asks which ones you have / don't have. Patterns: plain = whole word/phrase (case-insensitive); 're:' regex; 'cs:' case-sensitive regex. Add freely.",
+  ".NET": [
+    ".net",
+    "asp.net",
+    "dotnet"
+  ],
+  "Agile/Scrum": [
+    "agile",
+    "scrum"
+  ],
+  "Agora": [
+    "agora"
+  ],
+  "AI-assisted development": [
+    "copilot",
+    "claude code",
+    "ai-assisted",
+    "ai tools"
+  ],
+  "Android": [
+    "android"
+  ],
+  "Angular": [
+    "angular"
+  ],
+  "Animations": [
+    "animation",
+    "animations",
+    "rive",
+    "lottie"
+  ],
+  "App Store / Play Store releases": [
+    "app store",
+    "play store",
+    "google play",
+    "testflight"
+  ],
+  "Arabic (spoken)": [
+    "arabic speaker",
+    "fluent in arabic",
+    "arabic language",
+    "arabic is a must",
+    "arabic (required)"
+  ],
+  "AWS": [
+    "aws",
+    "amazon web services",
+    "ec2",
+    "s3",
+    "lambda"
+  ],
+  "Azure": [
+    "azure",
+    "app center",
+    "application insights"
+  ],
+  "Bitrise": [
+    "bitrise"
+  ],
+  "BLoC": [
+    "bloc",
+    "cubit"
+  ],
+  "Bluetooth/BLE": [
+    "ble",
+    "bluetooth"
+  ],
+  "build_runner (code generation)": [
+    "build_runner",
+    "buildrunner",
+    "build runner",
+    "code generation",
+    "codegen",
+    "json_serializable",
+    "freezed"
+  ],
+  "C#": [
+    "c#",
+    "csharp"
+  ],
+  "C++": [
+    "c++",
+    "cpp"
+  ],
+  "Certificate pinning": [
+    "certificate pinning",
+    "ssl pinning"
+  ],
+  "CI/CD": [
+    "ci/cd",
+    "ci / cd",
+    "continuous integration",
+    "continuous delivery"
+  ],
+  "Clean Architecture": [
+    "clean architecture"
+  ],
+  "Code review": [
+    "code review",
+    "code reviews"
+  ],
+  "Codemagic": [
+    "codemagic"
+  ],
+  "Cross-platform": [
+    "cross-platform",
+    "cross platform"
+  ],
+  "Cypress": [
+    "cypress"
+  ],
+  "Dart": [
+    "dart"
+  ],
+  "Data engineering": [
+    "etl",
+    "data pipeline",
+    "airflow",
+    "dbt",
+    "spark"
+  ],
+  "Dependency injection": [
+    "dependency injection"
+  ],
+  "Django": [
+    "django"
+  ],
+  "Docker": [
+    "docker",
+    "kubernetes"
+  ],
+  "Elasticsearch": [
+    "elasticsearch",
+    "opensearch"
+  ],
+  "Express": [
+    "express.js",
+    "expressjs"
+  ],
+  "FastAPI": [
+    "fastapi"
+  ],
+  "Fastlane": [
+    "fastlane"
+  ],
+  "Figma": [
+    "figma"
+  ],
+  "Firebase": [
+    "firebase",
+    "firestore",
+    "crashlytics",
+    "fcm",
+    "cloud messaging"
+  ],
+  "Flask": [
+    "flask"
+  ],
+  "Flavors / environments": [
+    "flavors",
+    "flavours",
+    "build variants"
+  ],
+  "Flutter": [
+    "flutter"
+  ],
+  "Flutter Web": [
+    "flutter web"
+  ],
+  "GCP": [
+    "gcp",
+    "google cloud"
+  ],
+  "Geolocation": [
+    "geolocation",
+    "geofencing",
+    "location services"
+  ],
+  "get_it (DI)": [
+    "get_it",
+    "getit",
+    "re:\\bget[_ ]it\\b(?=\\s*(?:\\)|,|for|package|di|service locator))"
+  ],
+  "GetX": [
+    "getx"
+  ],
+  "Git": [
+    "git",
+    "github",
+    "version control"
+  ],
+  "GitHub Actions": [
+    "github actions"
+  ],
+  "GitLab CI": [
+    "gitlab ci",
+    "gitlab-ci"
+  ],
+  "Go": [
+    "golang",
+    "re:\\bgo\\s+(language|developer|engineer)\\b"
+  ],
+  "go_router (navigation)": [
+    "go_router",
+    "gorouter",
+    "go router",
+    "declarative routing",
+    "deep linking"
+  ],
+  "Google Maps": [
+    "google maps",
+    "maps sdk"
+  ],
+  "GraphQL": [
+    "graphql"
+  ],
+  "Hive": [
+    "re:\\bhive\\b(?!\\s+mind)"
+  ],
+  "Integration testing": [
+    "integration test",
+    "integration tests",
+    "integration testing"
+  ],
+  "iOS": [
+    "ios"
+  ],
+  "Isar": [
+    "isar"
+  ],
+  "Java": [
+    "cs:\\bJava\\b"
+  ],
+  "JavaScript": [
+    "javascript",
+    "cs:\\bJS\\b"
+  ],
+  "Jenkins": [
+    "jenkins"
+  ],
+  "Jest": [
+    "jest"
+  ],
+  "Jetpack Compose": [
+    "jetpack compose"
+  ],
+  "Jira": [
+    "jira"
+  ],
+  "JSON": [
+    "json"
+  ],
+  "JWT": [
+    "jwt"
+  ],
+  "Kafka": [
+    "kafka"
+  ],
+  "Kotlin": [
+    "kotlin",
+    "jetpack compose"
+  ],
+  "Kotlin Multiplatform": [
+    "kotlin multiplatform",
+    "kmp"
+  ],
+  "Linux": [
+    "linux"
+  ],
+  "LLM / AI APIs": [
+    "openai",
+    "llm",
+    "large language model",
+    "gen ai",
+    "generative ai"
+  ],
+  "Local storage (Drift/SQLite)": [
+    "drift",
+    "sqlite",
+    "local database",
+    "local storage",
+    "offline storage"
+  ],
+  "Machine learning": [
+    "machine learning",
+    "ml models"
+  ],
+  "Mentoring": [
+    "mentor",
+    "mentoring",
+    "mentorship"
+  ],
+  "Microservices": [
+    "microservices",
+    "microservice"
+  ],
+  "MongoDB": [
+    "mongodb",
+    "mongo"
+  ],
+  "MVC": [
+    "mvc"
+  ],
+  "MVVM": [
+    "mvvm"
+  ],
+  "MySQL": [
+    "mysql"
+  ],
+  "NestJS": [
+    "nestjs",
+    "nest.js"
+  ],
+  "Next.js": [
+    "next.js",
+    "nextjs"
+  ],
+  "Node.js": [
+    "node.js",
+    "nodejs",
+    "re:\\bnode\\b"
+  ],
+  "OAuth 2.0": [
+    "oauth",
+    "oauth2",
+    "oauth 2.0"
+  ],
+  "Objective-C": [
+    "objective-c",
+    "objc"
+  ],
+  "OOP": [
+    "oop",
+    "object-oriented",
+    "object oriented"
+  ],
+  "OWASP": [
+    "owasp"
+  ],
+  "Payments": [
+    "payment gateway",
+    "payment integration",
+    "payments integration",
+    "stripe",
+    "apple pay",
+    "google pay",
+    "tabby",
+    "tamara",
+    "fintech",
+    "in-app purchase"
+  ],
+  "Performance optimization": [
+    "performance optimization",
+    "performance tuning",
+    "profiling",
+    "devtools"
+  ],
+  "PHP": [
+    "php",
+    "laravel",
+    "symfony"
+  ],
+  "Platform channels": [
+    "platform channel",
+    "platform channels",
+    "method channel",
+    "native integration"
+  ],
+  "Playwright": [
+    "playwright"
+  ],
+  "PostgreSQL": [
+    "postgresql",
+    "postgres"
+  ],
+  "Provider": [
+    "re:\\bprovider\\b(?=\\s*[,/)]|\\s+(?:or|and|state|package|pattern)\\b)",
+    "re:\\b(?:bloc|riverpod|getx|cubit)\\b[^.\\n]{0,40}\\bprovider\\b"
+  ],
+  "Push notifications": [
+    "push notification",
+    "push notifications"
+  ],
+  "Pusher": [
+    "pusher"
+  ],
+  "Python": [
+    "python"
+  ],
+  "QR/barcode": [
+    "qr",
+    "barcode"
+  ],
+  "RabbitMQ": [
+    "rabbitmq"
+  ],
+  "React": [
+    "react",
+    "react.js",
+    "reactjs"
+  ],
+  "React Native": [
+    "react native"
+  ],
+  "Real-time streams": [
+    "real-time data",
+    "realtime data",
+    "websocket",
+    "websockets",
+    "re:\\b(?:dart|reactive)\\s+streams?\\b"
+  ],
+  "Realm": [
+    "realm"
+  ],
+  "Redis": [
+    "redis"
+  ],
+  "Redux": [
+    "redux"
+  ],
+  "Repository pattern": [
+    "repository pattern"
+  ],
+  "RESTful APIs": [
+    "restful",
+    "re:\\brest\\s*(?:apis?|services?|endpoints?|interfaces?)\\b",
+    "cs:\\bREST\\b"
+  ],
+  "Riverpod": [
+    "riverpod"
+  ],
+  "RTL/localization": [
+    "rtl",
+    "localization",
+    "localisation",
+    "internationalization",
+    "i18n",
+    "bilingual"
+  ],
+  "Ruby": [
+    "ruby",
+    "rails",
+    "ruby on rails"
+  ],
+  "Rust": [
+    "cs:\\bRust\\b"
+  ],
+  "Scala": [
+    "scala"
+  ],
+  "Secure storage": [
+    "keychain",
+    "keystore",
+    "secure storage",
+    "encryption"
+  ],
+  "Selenium": [
+    "selenium"
+  ],
+  "Social sign-in": [
+    "social login",
+    "sign in with apple",
+    "google sign-in"
+  ],
+  "SOLID": [
+    "solid principles",
+    "cs:\\bSOLID\\b"
+  ],
+  "SonarQube": [
+    "sonarqube"
+  ],
+  "Spring": [
+    "spring boot",
+    "spring framework"
+  ],
+  "SQL": [
+    "sql"
+  ],
+  "SSO": [
+    "sso",
+    "single sign-on",
+    "single sign on"
+  ],
+  "State management": [
+    "state management"
+  ],
+  "Swagger/OpenAPI": [
+    "swagger",
+    "openapi"
+  ],
+  "Swift": [
+    "swift",
+    "swiftui"
+  ],
+  "SwiftUI": [
+    "swiftui"
+  ],
+  "Tailwind": [
+    "tailwind"
+  ],
+  "TDD": [
+    "tdd",
+    "test-driven",
+    "test driven"
+  ],
+  "Terraform": [
+    "terraform"
+  ],
+  "TypeScript": [
+    "typescript"
+  ],
+  "UI/UX": [
+    "ui/ux",
+    "ux",
+    "user experience",
+    "material design",
+    "cupertino"
+  ],
+  "UIKit": [
+    "uikit"
+  ],
+  "Unit testing": [
+    "unit test",
+    "unit tests",
+    "unit testing"
+  ],
+  "Vue": [
+    "vue",
+    "vue.js",
+    "vuejs"
+  ],
+  "Widget testing": [
+    "widget test",
+    "widget tests",
+    "widget testing"
+  ]
+}

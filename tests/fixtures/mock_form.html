@@ -1,0 +1,50 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mock application</title></head>
+<body>
+<form id="f" onsubmit="window.submitted = true; return false;">
+  <label for="first_name">First Name *</label><input id="first_name" type="text" required>
+  <label for="last_name">Last Name *</label><input id="last_name" type="text" required>
+  <label for="email">Email *</label><input id="email" type="text" required>
+  <label for="phone">Phone</label><input id="phone" type="tel">
+
+  <label for="country">Country</label>
+  <input id="country" type="text" role="combobox" aria-autocomplete="list" autocomplete="off">
+  <div id="menu" role="listbox"></div>
+
+  <label for="resume">Resume/CV</label><input id="resume" type="file">
+  <label for="cover">Cover Letter</label><input id="cover" type="file">
+
+  <label for="notice">Notice period</label>
+  <select id="notice"><option></option><option>Immediately</option><option>1 month</option><option>2 months</option></select>
+
+  <fieldset><legend>How many years of professional experience do you have?</legend>
+    <label><input type="radio" name="yrs" value="a">0-4</label>
+    <label><input type="radio" name="yrs" value="b">4-6</label>
+    <label><input type="radio" name="yrs" value="c">6+</label>
+  </fieldset>
+
+  <label for="why">Why do you want to join us? *</label><textarea id="why" required></textarea>
+
+  <fieldset><legend>Gender identity</legend>
+    <label><input type="radio" name="g" value="m">Male</label>
+    <label><input type="radio" name="g" value="f">Female</label>
+  </fieldset>
+  <label><input type="checkbox" id="consent" name="consent"> I agree to the privacy policy</label>
+
+  <button type="submit" id="submit">Submit application</button>
+</form>
+<script>
+  // Minimal react-select-like behaviour: options appear while typing.
+  const all = ['United Arab Emirates', 'United Kingdom', 'Saudi Arabia', 'Pakistan'];
+  const input = document.getElementById('country'), menu = document.getElementById('menu');
+  input.addEventListener('input', () => {
+    menu.innerHTML = '';
+    all.filter(c => c.toLowerCase().includes(input.value.toLowerCase())).forEach(c => {
+      const o = document.createElement('div'); o.setAttribute('role', 'option'); o.textContent = c;
+      o.onclick = () => { input.value = c; input.dataset.picked = c; menu.innerHTML = ''; };
+      menu.appendChild(o);
+    });
+  });
+  window.submitted = false;
+</script>
+</body></html>

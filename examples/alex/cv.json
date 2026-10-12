@@ -1,0 +1,112 @@
+{
+  "name": "ALEX DOE",
+  "headline": "Senior Flutter Developer | Mobile Application Developer",
+  "contact": [
+    "Dubai, UAE",
+    "+971 50 000 0000",
+    "alex.doe@example.com"
+  ],
+  "links": [
+    "linkedin.com/in/alex-doe-example",
+    "github.com/alex-doe-example"
+  ],
+  "summary": "Mobile engineer with 6 years building cross-platform iOS and Android apps in Flutter and Dart. Comfortable owning features end to end: architecture (BLoC, Clean Architecture), REST and Firebase integrations, payments, performance tuning and releases, working closely with product and design.",
+  "competencies": {
+    "lang": {
+      "label": "Languages",
+      "text": "Dart (Expert), Python (Basic), SQL (Basic)"
+    },
+    "fw": {
+      "label": "Frameworks & Platforms",
+      "text": "Flutter SDK, iOS, Android (cross-platform)"
+    },
+    "state": {
+      "label": "State Management",
+      "text": "BLoC, Cubit, Provider, Riverpod"
+    },
+    "arch": {
+      "label": "Architecture & Design",
+      "text": "Clean Architecture, MVVM, Repository Pattern, Dependency Injection, SOLID"
+    },
+    "backend": {
+      "label": "Backend & Cloud",
+      "text": "Firebase (Auth, Firestore, FCM, Crashlytics), REST APIs, OAuth 2.0"
+    },
+    "testing": {
+      "label": "Testing",
+      "text": "Unit, widget and integration tests"
+    },
+    "tools": {
+      "label": "Tools",
+      "text": "Git/GitHub, GitHub Actions, Xcode, Android Studio, Figma, Jira"
+    }
+  },
+  "competency_order": [
+    "lang",
+    "fw",
+    "state",
+    "arch",
+    "backend",
+    "testing",
+    "tools"
+  ],
+  "experience": [
+    {
+      "id": "acmeshop",
+      "title": "Senior Flutter Developer",
+      "company": "Acme Shop",
+      "location": "Dubai, UAE",
+      "dates": "Jan 2023 – Present",
+      "bullets": {
+        "architected": "Architected and shipped a cross-platform e-commerce app in Flutter and Dart used by 50K+ customers on iOS and Android.",
+        "cut": "Cut app startup time by 30% with Flutter DevTools profiling, image caching and lazy loading.",
+        "integrated": "Integrated REST APIs, Firebase and Stripe payments with secure, tokenized checkout flows.",
+        "introduced": "Introduced BLoC, Clean Architecture and unit/widget tests, raising test coverage to 70%.",
+        "released": "Released 15+ features on schedule with product, design and backend teams in two-week sprints."
+      },
+      "order": [
+        "architected",
+        "cut",
+        "integrated",
+        "introduced",
+        "released"
+      ]
+    },
+    {
+      "id": "brightapps",
+      "title": "Flutter Developer",
+      "company": "Bright Apps",
+      "location": "Remote",
+      "dates": "Mar 2020 – Dec 2022",
+      "bullets": {
+        "delivered": "Delivered 4 client apps end to end, from requirements to App Store and Google Play release.",
+        "built": "Built reusable widgets and a shared component library that sped up new screens by 25%.",
+        "mentored": "Mentored 2 junior developers through code reviews and pair programming."
+      },
+      "order": [
+        "delivered",
+        "built",
+        "mentored"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "acmeshopapp",
+      "name": "Acme Shop",
+      "subtitle": "E-commerce app (iOS & Android)",
+      "meta": "50K+ users",
+      "tech": "Flutter, BLoC, Firebase, Stripe",
+      "bullets": [
+        "Live on the App Store and Google Play."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "BSc Computer Science",
+      "dates": "2015 – 2019",
+      "school": "Example University"
+    }
+  ]
+}
