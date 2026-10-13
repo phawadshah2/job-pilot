@@ -8,7 +8,7 @@
  * version > Deploy. That keeps the same /exec URL.
  *
  * "Anyone" only means anyone holding the secret URL *and* the TOKEN can use it:
- * write rows, and read back only the Key / Status / Applied date / Follow-up
+ * write rows, and read back only the Key / Status / Submitted date / Follow-up
  * date columns. Without the token every request is rejected.
  *
  * action "pull" returns Key/Status/dates so status changes made in the sheet reach the local DB.
@@ -17,11 +17,13 @@
  *
  * Rows are upserted by the Key column. For rows that already exist, only
  * `update_columns` are refreshed, and Status never moves backwards, so a row
- * you marked Applied stays Applied.
+ * you marked Submitted stays Submitted.
  */
 const SHEET_NAME = 'Jobs';
-const STATUSES = ['New', 'Tailoring', 'Ready', 'Applied', 'Interview', 'Offer', 'Rejected', 'Skipped'];
-const STATUS_RANK = { New: 0, Tailoring: 1, Ready: 2, Applied: 3, Interview: 4, Offer: 5, Rejected: 5, Skipped: 5 };
+const STATUSES = ['New', 'Tailoring', 'Ready', 'Approved', 'Pending', 'Failed', 'Manual action required',
+                  'Submitted', 'Interview', 'Offer', 'Rejected', 'Skipped'];
+const STATUS_RANK = { New: 0, Tailoring: 1, Ready: 2, Approved: 3, Pending: 4, Failed: 4, 'Manual action required': 4,
+                      Submitted: 5, Interview: 6, Offer: 7, Rejected: 7, Skipped: 7, Applied: 5 };
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -65,7 +67,8 @@ function doPost(e) {
       let changed = false;
       updateCols.forEach(c => {
         const i = header.indexOf(c);
-        if (c === 'Status' && (STATUS_RANK[current[i]] || 0) >= (STATUS_RANK[rec[c]] || 0)) return;
+        // Status only moves forward (equal ranks may switch, e.g. Failed -> Pending).
+        if (c === 'Status' && (STATUS_RANK[current[i]] || 0) > (STATUS_RANK[rec[c]] || 0)) return;
         if (rec[c] !== '' && rec[c] !== current[i]) { current[i] = rec[c]; changed = true; }
       });
       if (changed) { range.setValues([current]); updated++; }
@@ -88,7 +91,7 @@ function readRows() {
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
   const header = values[0];
-  const want = ['Key', 'Status', 'Applied date', 'Follow-up date'];
+  const want = ['Key', 'Status', 'Submitted date', 'Follow-up date'];
   const idx = want.map(c => header.indexOf(c));
   const fmt = v => (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(v);
   return values.slice(1).filter(r => r[idx[0]]).map(r => {
@@ -125,7 +128,9 @@ function getSheet(columns) {
     sheet.appendRow(columns);
     sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground('#e8eaf6');
     sheet.setFrozenRows(1);
-    const widths = { Company: 180, Role: 260, Location: 180, 'Work mode': 120, Source: 140, URL: 220, Notes: 260, Gaps: 200 };
+    const widths = { Company: 180, Role: 260, Location: 180, 'Work mode': 120, Salary: 150, Source: 140, URL: 220,
+                     'Match explanation': 320, 'Missing requirements': 240, CV: 200, 'Cover letter': 200,
+                     Status: 170, Notes: 260 };
     columns.forEach((c, i) => { if (widths[c]) sheet.setColumnWidth(i + 1, widths[c]); });
   }
   ensureFilter(sheet, sheet.getLastColumn());

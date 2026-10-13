@@ -40,20 +40,25 @@ fictional profile.
 | What | Why | How |
 |---|---|---|
 | **JSearch** API key | Main source: Google for Jobs (LinkedIn, Indeed, Glassdoor, company sites) | Free plan (200 requests/month, hard cap) at openwebninja.com/api/jsearch |
-| **Google Sheet** (optional) | A tracker you can sort and filter (Location, Work mode, Source, Status…) | Paste `apps_script/Code.gs` into Extensions → Apps Script, set the TOKEN that setup prints, Deploy → Web app (Execute as: Me, Access: Anyone), give setup the `/exec` URL |
+| **Google Sheet** (optional) | A tracker with score, match explanation, missing requirements, salary, CV/cover letter and status; filter by Location, Work mode, Source, Status… | Paste `apps_script/Code.gs` into Extensions → Apps Script, set the TOKEN that setup prints, Deploy → Web app (Execute as: Me, Access: Anyone), give setup the `/exec` URL |
 | **Gmail app password** (optional) | Reads LinkedIn/Indeed job-alert emails for free, marks them read | Google Account → Security → 2-Step Verification → App passwords |
 
 ## Use
-With Claude Code in this folder, say **"find jobs"** (playbook: [FIND.md](FIND.md)), then **"apply"**.
+With Claude Code in this folder, say **"find jobs"**, then later **"apply"** (playbook: [FIND.md](FIND.md)).
 By hand:
 ```bash
-python3 -m jobpilot find                    # fetch + filter + score + prepare; prints a compact summary
-python3 -m jobpilot build <key>             # tailor.json -> CV -> checks -> PDFs (see TAILOR.md)
-.venv/bin/python -m jobpilot apply          # pre-fill each Ready job; you click Submit
+python3 -m jobpilot find                    # collect + clean + pre-score; prints jobs to review
+python3 -m jobpilot jd <key>...             # read a candidate's JD
+python3 -m jobpilot assess --file a.json    # record AI score/explanation/missing; strong ones get prepared
+python3 -m jobpilot build <key>...          # tailor.json -> CV (+ cover letter) PDFs, status Ready
+python3 -m jobpilot review                  # everything you're about to approve
+python3 -m jobpilot approve <key>...        # approve for applying
+.venv/bin/python -m jobpilot apply          # pre-fill approved jobs; you click Submit; status recorded
 python3 -m jobpilot followups               # applications due for a follow-up
-python3 -m jobpilot add --url URL --company X --title Y --jd jd.txt   # a job you found yourself
 python3 -m jobpilot sheet-reset             # empty the Google Sheet (asks first)
 ```
+Statuses: New → Tailoring → Ready → Approved → Pending / Failed / Manual action required → **Submitted**
+(only after the site's confirmation page or your explicit confirmation) → Interview → Offer / Rejected / Skipped.
 
 ## What's automated, and what never is
 - **Never automated:** clicking Submit; LinkedIn / Indeed / Glassdoor / Bayt / NaukriGulf forms (opened in

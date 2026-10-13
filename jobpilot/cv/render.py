@@ -147,3 +147,37 @@ def render(cv: dict, spec: dict | None = None) -> str:
 
     b.append("\n</body>\n</html>\n")
     return "\n".join(b)
+
+
+def letter_parts(letter) -> dict:
+    """tailor.json "cover_letter": plain text (blank lines separate paragraphs) or
+    {"greeting": "...", "paragraphs": [...], "closing": "Kind regards,"}."""
+    if isinstance(letter, str):
+        paras = [p.strip() for p in re.split(r"\n\s*\n", letter) if p.strip()]
+        return {"greeting": "", "paragraphs": paras, "closing": ""}
+    if not isinstance(letter, dict) or not letter.get("paragraphs"):
+        raise SpecError("cover_letter needs text or {'paragraphs': [...]}")
+    return {"greeting": letter.get("greeting", ""), "paragraphs": list(letter["paragraphs"]),
+            "closing": letter.get("closing", "")}
+
+
+def render_cover(cv: dict, letter, company: str, role: str, today: str) -> str:
+    """Cover letter in the same design: name + contact header, date, recipient, body, sign-off."""
+    parts = letter_parts(letter)
+    sep = '<span class="sep">|</span>'
+    greeting = parts["greeting"] or f"Dear {company} Hiring Team,"
+    closing = parts["closing"] or "Kind regards,"
+    b = [head(f"{cv['name'].title()} — Cover Letter — {company}"), "<body>\n",
+         f'<p class="name">{_e(cv["name"])}</p>',
+         f'<p class="headline">{_e(cv.get("headline", ""))}</p>']
+    for line in (cv.get("contact"), cv.get("links")):
+        if line:
+            b.append('<p class="contact">' + sep.join(_e(x) for x in line) + "</p>")
+    b.append('\n<h2>COVER LETTER</h2>')
+    b.append(f'<p class="summary">{_e(today)}</p>')
+    b.append(f'<p class="summary"><b>Re: {_e(role)}</b> · {_e(company)}</p>\n')
+    b.append(f'<p class="summary" style="margin-top:10pt">{_e(greeting)}</p>')
+    b += [f'<p class="summary" style="margin-top:8pt">{_e(p)}</p>' for p in parts["paragraphs"]]
+    b.append(f'<p class="summary" style="margin-top:12pt">{_e(closing)}<br>{_e(cv["name"].title())}</p>')
+    b.append("\n</body>\n</html>\n")
+    return "\n".join(b)

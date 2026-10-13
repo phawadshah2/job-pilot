@@ -49,6 +49,15 @@ class MockFormTest(unittest.TestCase):
         self.assertEqual(page.eval_on_selector("#resume", "e => e.files[0].name"), self.cv.name)
         self.assertEqual(page.eval_on_selector("#cover", "e => e.files.length"), 0)
 
+    def test_cover_letter_attached_when_one_exists(self):
+        cover = self.cv.with_name("Acme - Senior Flutter Developer - Cover Letter.pdf")
+        cover.write_bytes(b"%PDF-1.4 cover")
+        page = self.browser.new_page()
+        fields = runner.open_form(page, MOCK)
+        res = runner.fill(page, fields, {"_resume_path": str(self.cv), "_cover_path": str(cover)}, {})
+        self.assertEqual(page.eval_on_selector("#resume", "e => e.files[0].name"), self.cv.name)
+        self.assertEqual(page.eval_on_selector("#cover", "e => e.files[0].name"), cover.name)
+
     def test_never_submits_or_consents_or_answers_demographics(self):
         page, _ = self.run_fill()
         self.assertFalse(page.evaluate("window.submitted"))

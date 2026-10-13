@@ -7,7 +7,7 @@ Daily
     (Claude tailors each cv.html per TAILOR.md)
     python3 -m jobpilot finalize <key>     # guard, render both PDFs, verify, mark Ready
     .venv/bin/python -m jobpilot apply     # pre-fill each Ready job in Chrome; YOU click Submit
-    python3 -m jobpilot status <key> Applied
+    python3 -m jobpilot status <key> Submitted
 
 Other
     python3 -m jobpilot fetch --dry-run --why
@@ -25,6 +25,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import config, paths, sheet
+from . import status as status_mod
 from .filters import Filter
 from .http import HTTPError, URLError
 from .http import get_json
@@ -35,8 +36,7 @@ from .sources import SOURCES
 from .store import Store
 from .tailor import TailorError, finalize, prepare
 
-STATUSES = ["New", "Tailoring", "Ready", "Applied", "Interview", "Offer", "Rejected", "Skipped"]
-STATUS_RANK = {"New": 0, "Tailoring": 1, "Ready": 2, "Applied": 3, "Interview": 4, "Offer": 5, "Rejected": 5, "Skipped": 5}
+STATUSES = status_mod.STATUSES
 
 
 def load_cfg() -> dict:
@@ -250,7 +250,7 @@ def previous_applications(store: Store, r, this_dir: Path) -> list[str]:
     legacy = [Path(x).expanduser() for x in load_cfg()["user"].get("legacy_cv_dirs", [])]
     out = [d.name for root in legacy if root.is_dir() for d in sorted(root.iterdir())
            if d.is_dir() and d != this_dir and len(s) >= 4 and s in d.name and not (d / "job.json").exists()]
-    for o in store.query("company = ? AND key != ? AND status IN ('Applied','Interview','Offer','Rejected')",
+    for o in store.query(f"company = ? AND key != ? AND status IN {tuple(status_mod.APPLIED_OR_LATER)}",
                          (r["company"], r["key"])):
         out.append(f"{o['title'][:30]} ({o['status']})")
     return out
@@ -272,11 +272,14 @@ def cmd_finalize(args) -> int:
             rc = 1
             continue
         ready = rep.pages <= 2
-        store.update(r["key"], status="Ready" if ready else "Tailoring", cv_dir=str(rep.cv_pdf.parent))
+        store.update(r["key"], status="Ready" if ready else "Tailoring", cv_dir=str(rep.cv_pdf.parent),
+                     cv_pdf=str(rep.cv_pdf), cover_pdf=str(rep.cover_pdf) if rep.cover_pdf else None)
         print(f"{'✓' if ready else '…'} {r['company']} - {r['title']}{'' if ready else '  (still Tailoring: over 2 pages)'}")
         rc = rc if ready else 1
         print(f"  CV : {rep.cv_pdf}  ({rep.pages} page{'s' if rep.pages != 1 else ''})")
         print(f"  JD : {rep.jd_pdf}")
+        if rep.cover_pdf:
+            print(f"  Cover letter: {rep.cover_pdf}")
         print(f"  Keyword coverage: base {rep.old_cov}% → tailored {rep.new_cov}%")
         for w in rep.warnings:
             print(f"  ⚠ {w}")
@@ -296,16 +299,89 @@ def cmd_status(args) -> int:
     return sync(load_cfg(), store)
 
 
-def set_status(store: Store, r, status: str) -> None:
+def set_status(store: Store, r, status: str, note: str = "") -> None:
+    """Submitted also stamps the submitted date and the follow-up date. `note` is appended to Notes."""
+    status = status_mod.normalize(status)
     extra = {}
-    if status == "Applied" and not r["applied_at"]:
+    if status == "Submitted" and not r["applied_at"]:
         today = date.today()
         days = load_cfg().get("follow_up_days", 7)
         extra = {"applied_at": today.isoformat(), "follow_up_at": (today + timedelta(days=days)).isoformat()}
+    if note:
+        extra["notes"] = "; ".join(x for x in [r["notes"], note] if x)
     store.update(r["key"], status=status, **extra)
 
 
 # ------------------------------------------------------------------ apply --
+
+def _job_files(r) -> tuple[Path, dict, Path | None, Path | None]:
+    job_dir = Path(r["cv_dir"] or "")
+    meta = json.loads((job_dir / "job.json").read_text()) if (job_dir / "job.json").exists() else {}
+    cv = Path(r["cv_pdf"]) if r["cv_pdf"] else (job_dir / f"{meta.get('label', '')}.pdf")
+    cover = Path(r["cover_pdf"]) if r["cover_pdf"] else None
+    return job_dir, meta, (cv if cv.exists() else None), (cover if cover and cover.exists() else None)
+
+
+def _cover_text(job_dir: Path) -> str:
+    """Cover letter as plain text (for forms that have a text box instead of an upload)."""
+    from .cv.render import letter_parts
+    for name in ("tailor.final.json", "tailor.json"):
+        p = job_dir / name
+        if p.exists():
+            letter = json.loads(p.read_text()).get("cover_letter")
+            if letter:
+                parts = letter_parts(letter)
+                return "\n\n".join(x for x in [parts["greeting"], *parts["paragraphs"], parts["closing"]] if x)
+    return ""
+
+
+def cmd_review(args) -> int:
+    """Everything you're approving, per job: link, fit, salary, CV, cover letter, answers."""
+    store = open_store()
+    rows = [resolve(store, k) for k in args.keys] if args.keys else by_priority(store.query("status='Ready'"))
+    if not rows:
+        print("Nothing to review: no Ready jobs.")
+        return 0
+    app = json.loads(paths.applicant_file().read_text()) if paths.applicant_file().exists() else {}
+    answers = {k: v for k, v in app.pop("answers", {}).items() if not k.startswith("_")}
+    known = {k: v for k, v in app.items() if v not in (None, "") and not k.startswith("_")}
+    from .apply.runner import OPEN_ONLY, application_url, ats_of
+    for r in rows:
+        job_dir, meta, cv, cover = _job_files(r)
+        url = application_url(r["url"], r["apply_url"] or "")
+        score = r["ai_score"] if r["ai_score"] is not None else r["score"]
+        per_job = json.loads((job_dir / "answers.json").read_text()) if (job_dir / "answers.json").exists() else {}
+        manual = bool(OPEN_ONLY.search(url))
+        print(f"\n##### {r['key'][:8]} · {r['company']} — {r['title']}   [{r['status']}]")
+        print(f"  Where:   {r['location']} ({r['work_mode']})   Salary: {r['salary'] or 'not stated'}")
+        print(f"  Apply:   {url}   ({'manual: you apply in your normal browser' if manual else ats_of(url) + ' form, pre-filled'})")
+        print(f"  Score:   {score}  {r['match_explanation'] or ''}")
+        print(f"  Missing: {r['missing'] or r['gaps'] or 'nothing detected'}")
+        print(f"  CV:      {cv or '✗ not built yet'}")
+        print(f"  Cover:   {cover or 'none'}")
+        print(f"  Answers: {', '.join(f'{k}={v}' for k, v in known.items() if k not in ('first_name','last_name','full_name','email','phone','linkedin','github','portfolio'))}")
+        if answers or per_job:
+            print(f"           + {len(answers) + len(per_job)} saved question answer(s)")
+        prior = previous_applications(store, r, job_dir)
+        if prior:
+            print(f"  ⚠ applied to this company before: {', '.join(prior)}")
+        print("  Custom questions on the form are shown in the terminal before you submit.")
+    print("\nApprove with:  python3 -m jobpilot approve <key> [<key> ...]")
+    return 0
+
+
+def cmd_approve(args) -> int:
+    store = open_store()
+    for ref in args.keys:
+        r = resolve(store, ref)
+        if r["status"] != "Ready":
+            print(f"  {r['key'][:8]} {r['company']}: is {r['status']}, only Ready jobs can be approved")
+            continue
+        store.update(r["key"], status="Approved", approved_at=date.today().isoformat())
+        print(f"  ✓ approved {r['key'][:8]} {r['company']} — {r['title']}")
+    store.commit()
+    return sync(load_cfg(), store)
+
 
 def cmd_apply(args) -> int:
     try:
@@ -323,12 +399,18 @@ def cmd_apply(args) -> int:
     global_answers = {k: v for k, v in applicant.pop("answers", {}).items() if not k.startswith("_")}
 
     store = open_store()
+    applyable = status_mod.APPLYABLE
     if args.keys:
         rows = [resolve(store, k) for k in args.keys]
+        blocked = [r for r in rows if r["status"] not in applyable]
+        for r in blocked:
+            print(f"  {r['key'][:8]} {r['company']}: status {r['status']}. Review and approve it first "
+                  f"(python3 -m jobpilot review {r['key'][:8]}; python3 -m jobpilot approve {r['key'][:8]})")
+        rows = [r for r in rows if r["status"] in applyable]
     else:
-        rows = by_priority(store.query("status='Ready'", order="score DESC, first_seen"))[:args.n]
+        rows = by_priority(store.query(f"status IN {tuple(applyable)}"))[:args.n]
     if not rows:
-        print("No Ready jobs. Tailor + finalize some first.")
+        print("Nothing approved to apply for. Run `jobpilot review`, then `jobpilot approve <key>`.")
         return 0
 
     with sync_playwright() as p:
@@ -345,118 +427,141 @@ def cmd_apply(args) -> int:
 
 
 def apply_one(store, r, page, runner, applicant, global_answers, plan_only) -> str:
-    job_dir = Path(r["cv_dir"] or "")
-    meta_p = job_dir / "job.json"
-    if not meta_p.exists():
-        print(f"! {r['company']} - {r['title']}: no tailored CV folder (prepare + finalize first)")
-        return "next"
-    meta = json.loads(meta_p.read_text())
-    cv = job_dir / f"{meta['label']}.pdf"
-    if not cv.exists():
-        print(f"! {meta['label']}: CV PDF missing; run finalize")
+    job_dir, meta, cv, cover = _job_files(r)
+    if not meta or not cv:
+        print(f"! {r['company']} - {r['title']}: no finalized CV (run `jobpilot build {r['key'][:8]}`)")
         return "next"
     url = runner.application_url(r["url"], r["apply_url"] or "")
-    print(f"\n=== {meta['label']}  (score {r['score']}, {runner.ats_of(url)})\n    {url}")
+    print(f"\n=== {meta['label']}  ({runner.ats_of(url)})\n    {url}")
 
-    if runner.OPEN_ONLY.search(url) and plan_only:
-        print(f"    {runner.site_name(url)}: never automated; a real run opens it in your normal browser.")
-        return "next"
-    if runner.OPEN_ONLY.search(url):
-        # Opened in your everyday browser, NOT the automated Chrome: LinkedIn & co. flag
-        # automation-controlled browsers, and we never want your account signed in there.
+    def manual(reason: str) -> str:
+        """Sites we never automate (or forms we couldn't reach): you apply in your own browser."""
+        if plan_only:
+            print(f"    {reason}: a real run opens it in your normal browser.")
+            return "next"
         _open_in_default_browser(url)
         _copy_to_clipboard(str(cv))
-        print(f"    {runner.site_name(url)} doesn't allow automated applications: opened it in your normal browser.\n"
-              f"    Apply by hand there. CV path copied to clipboard:\n    {cv}")
-    else:
-        applicant = dict(applicant, _resume_path=str(cv))
-        answers = runner.load_answers(job_dir, global_answers)
-        try:
-            fields = runner.open_form(page, url)
-        except runner.RestrictedSite as e:
-            page.goto("about:blank")
-            _open_in_default_browser(str(e))
-            _copy_to_clipboard(str(cv))
-            print(f"    Redirected to {runner.site_name(str(e))}, which doesn't allow automation: opened it in your "
-                  f"normal browser instead. Apply by hand. CV path copied to clipboard.")
-            choice = _ask(page, runner, watch=False)
-            if choice in ("a", "s"):
-                set_status(store, store.get(r["key"]), "Applied" if choice == "a" else "Skipped")
-                store.commit()
-                sync(load_cfg(), store)
-            return "quit" if choice == "q" else "next"
-        if plan_only:
-            from .apply.rules import build_plan
-            if not runner._has_form(fields):
-                print("    No form on this page (listing site, bot check, or multi-step portal): "
-                      "a real `apply` run waits for you to click through.")
-            _print_plan(build_plan(fields, applicant, answers), len(fields))
-            return "next"
+        print(f"    {reason}. Opened in your normal browser; CV path copied to clipboard:\n    {cv}"
+              + (f"\n    Cover letter: {cover}" if cover else ""))
+        return _record(store, r, _ask(page, runner, watch=False), manual=True, why=reason)
+
+    if runner.OPEN_ONLY.search(url):
+        return manual(f"{runner.site_name(url)} doesn't allow automated applications")
+
+    applicant = dict(applicant, _resume_path=str(cv), _cover_path=str(cover) if cover else "",
+                     _cover_text=_cover_text(job_dir))
+    answers = runner.load_answers(job_dir, global_answers)
+    try:
+        fields = runner.open_form(page, url)
+    except runner.RestrictedSite as e:
+        page.goto("about:blank")
+        url = str(e)
+        return manual(f"redirected to {runner.site_name(url)}, which doesn't allow automation")
+    if plan_only:
+        from .apply.rules import build_plan
         if not runner._has_form(fields):
-            if runner.is_bot_check(page):
-                print("    The site is showing a security check: complete it yourself in the Chrome window.")
-            print("    No application form here yet. In Chrome, click the site's Apply button "
-                  "(new tabs are fine); I'll take over as soon as a form appears…")
-            page, fields = runner.wait_for_form(page.context, timeout_s=600)
-            if page is None:
-                print("    Timed out waiting for a form; leaving this job Ready.")
-                return "next"
-            print(f"    Form found: {page.url[:100]}")
-        while True:
-            try:
-                res = runner.fill(page, fields, applicant, answers)
-            except runner.RestrictedSite:
-                print("    This tab is now on a site that doesn't allow automation: not touching it. Apply by hand.")
-                choice = _ask(page, runner, watch=False)
-                break
-            runner.highlight(page, fields, res, meta["label"])
-            q = runner.write_questions(job_dir, res)
-            print(f"    filled {len(res.done)} field(s) ({', '.join(sorted({a.why for a in res.plan.actions})) or 'nothing new'})")
-            for f in res.failed:
-                print(f"    ⚠ {f}")
-            if res.plan.unanswered:
-                print(f"    {len(res.plan.unanswered)} question(s) for you (red in the browser)" + (f", listed in {q}" if q else ""))
-            if res.plan.skipped_sensitive:
-                print(f"    left for you on purpose (consent/demographic): {len(res.plan.skipped_sensitive)}")
-            choice = _ask(page, runner)
-            if choice != "r":
-                break
-            # Re-scan the page as it is now (keeps what you typed; fills only empty fields).
-            answers = runner.load_answers(job_dir, global_answers)
-            fields = runner.discover(page)
-        if choice == "q":
-            return "quit"
-        if choice in ("a", "s"):
-            set_status(store, store.get(r["key"]), "Applied" if choice == "a" else "Skipped")
-            store.commit()
-            print("    → " + ("Applied (follow-up date set)" if choice == "a" else "Skipped"))
-            sync(load_cfg(), store)  # sheet updates right away, not at the end
+            print("    No form on this page (listing site, bot check, or multi-step portal): "
+                  "a real `apply` run waits for you to click through.")
+        _print_plan(build_plan(fields, applicant, answers), len(fields))
         return "next"
-    choice = _ask(page, runner, watch=False)
-    if choice in ("a", "s"):
-        set_status(store, store.get(r["key"]), "Applied" if choice == "a" else "Skipped")
-        store.commit()
-        sync(load_cfg(), store)
+    if not runner._has_form(fields):
+        if runner.is_bot_check(page):
+            print("    The site is showing a security check: complete it yourself in the Chrome window.")
+        print("    No application form here yet. In Chrome, click the site's Apply button "
+              "(new tabs are fine); I'll take over as soon as a form appears…")
+        page, fields = runner.wait_for_form(page.context, timeout_s=600)
+        if page is None:
+            set_status(store, store.get(r["key"]), "Manual action required", note="no application form reached")
+            store.commit()
+            sync(load_cfg(), store)
+            print("    Timed out waiting for a form → Manual action required.")
+            return "next"
+        print(f"    Form found: {page.url[:100]}")
+    while True:
+        try:
+            res = runner.fill(page, fields, applicant, answers)
+        except runner.RestrictedSite:
+            print("    This tab is now on a site that doesn't allow automation: not touching it. Apply by hand.")
+            return _record(store, r, _ask(page, runner, watch=False), manual=True, why="moved to a restricted site")
+        runner.highlight(page, fields, res, meta["label"])
+        q = runner.write_questions(job_dir, res)
+        _before_submit(meta, fields, res, cv, cover, q)
+        choice = _ask(page, runner)
+        if choice != "r":
+            break
+        # Re-scan the page as it is now (keeps what you typed; fills only empty fields).
+        answers = runner.load_answers(job_dir, global_answers)
+        fields = runner.discover(page)
+    return _record(store, r, choice)
+
+
+def _before_submit(meta, fields, res, cv, cover, questions_file) -> None:
+    """Exactly what is about to be sent, printed before you click Submit."""
+    from .apply.rules import question_text
+    label = {f["id"]: question_text(f) for f in fields}
+    print(f"\n    ── BEFORE YOU SUBMIT: {meta['label']} ──")
+    for a in res.plan.actions:
+        if a.field_id in res.done:
+            shown = Path(a.value).name if a.kind == "upload" else a.value
+            print(f"    ✓ {label.get(a.field_id, a.why)[:60]:<60} {shown[:70]}")
+    print(f"    CV attached:     {cv.name if any(a.why == 'resume' and a.field_id in res.done for a in res.plan.actions) else '✗ not attached (attach ' + cv.name + ' yourself)'}")
+    if cover:
+        att = any(a.why in ('cover letter',) and a.field_id in res.done for a in res.plan.actions)
+        print(f"    Cover letter:    {cover.name if att else 'not requested by this form'}")
+    for f in res.failed:
+        print(f"    ⚠ couldn't fill: {f}")
+    if res.plan.unanswered:
+        print(f"    ✗ {len(res.plan.unanswered)} question(s) for you (red in the browser)"
+              + (f", listed in {questions_file}" if questions_file else "") + ":")
+        for u in res.plan.unanswered[:12]:
+            print(f"       - {u['question'][:90]}")
+    if res.plan.skipped_sensitive:
+        print(f"    • left for you on purpose (consent/demographic): {len(res.plan.skipped_sensitive)}")
+
+
+def _record(store, r, choice: str, manual: bool = False, why: str = "") -> str:
+    """Map what happened to a status. Submitted only with a confirmation."""
+    today = date.today().isoformat()
+    r = store.get(r["key"])
+    if choice == "confirmed":
+        status, note = "Submitted", f"submitted {today} (confirmation page seen)"
+    elif choice == "a":
+        seen = input("    Did you see the site's confirmation (e.g. 'Thank you for applying')? [y/n] ").strip().lower()
+        status, note = (("Submitted", f"submitted {today} (you confirmed)") if seen.startswith("y")
+                        else ("Pending", f"{today}: submitted? not confirmed yet"))
+    elif choice == "f":
+        reason = input("    What went wrong? (optional) ").strip()
+        status, note = "Failed", f"{today}: failed" + (f": {reason}" if reason else "")
+    elif choice == "s":
+        status, note = "Skipped", f"{today}: skipped at apply"
+    elif manual:
+        status, note = "Manual action required", f"{today}: {why}"
+    else:  # "l" later, or "q" quit with the form open
+        status, note = "Pending", f"{today}: application started, not finished"
+    set_status(store, r, status, note=note)
+    store.commit()
+    print(f"    → {status}")
+    sync(load_cfg(), store)  # sheet updates right away
     return "quit" if choice == "q" else "next"
 
 
 def _ask(page, runner, watch: bool = True) -> str:
-    """Wait for a key, or (watch=True) for the site's confirmation page, which counts as 'a'."""
+    """Wait for a key, or (watch=True) for the site's confirmation page ('confirmed')."""
     import select
-    print("    Review in Chrome and click Submit YOURSELF. "
-          + ("It's marked Applied automatically when the confirmation page shows. " if watch else "")
-          + "Or press: [a] submitted  [s] skip  [r] re-fill  [l] later  [q] quit")
+    print("    Review everything above and in Chrome, then click Submit YOURSELF."
+          + (" It's recorded as Submitted automatically when the confirmation page shows." if watch else "")
+          + "\n    Keys: [a] I submitted  [f] failed  [l] later  [s] skip job  [r] re-fill  [q] quit")
     form_url = page.url
     while True:
         ready, _, _ = select.select([sys.stdin], [], [], 2.0)
         if ready:
             c = sys.stdin.readline().strip().lower()
-            if c in ("a", "s", "r", "l", "q"):
+            if c in ("a", "f", "l", "s", "r", "q"):
                 return c
             continue
         if watch and runner.submitted(page, form_url):
-            print("    ✓ Confirmation page detected: marking Applied.")
-            return "a"
+            print("    ✓ Confirmation page detected.")
+            return "confirmed"
 
 
 def _print_plan(plan, n_fields: int) -> None:
@@ -523,16 +628,18 @@ def pull(cfg: dict, store: Store) -> int:
     changed = 0
     for s in rows:
         r = store.get(s.get("Key", ""))
-        new = s.get("Status", "")
-        if not r or new not in STATUS_RANK or STATUS_RANK[new] <= STATUS_RANK.get(r["status"], 0):
+        new = status_mod.normalize(s.get("Status", ""))
+        if not r or new not in status_mod.RANK or new == status_mod.normalize(r["status"]) \
+                or not status_mod.can_move(r["status"], new):
             continue
         extra = {}
-        if s.get("Applied date") and not r["applied_at"]:
-            extra["applied_at"] = s["Applied date"][:10]
+        submitted = s.get("Submitted date") or s.get("Applied date")
+        if submitted and not r["applied_at"]:
+            extra["applied_at"] = submitted[:10]
         if s.get("Follow-up date") and not r["follow_up_at"]:
             extra["follow_up_at"] = s["Follow-up date"][:10]
-        if new == "Applied" and not (r["applied_at"] or extra.get("applied_at")):
-            set_status(store, r, "Applied")
+        if new == "Submitted" and not (r["applied_at"] or extra.get("applied_at")):
+            set_status(store, r, "Submitted", note="marked Submitted in the sheet")
         else:
             store.update(r["key"], status=new, **extra)
         changed += 1
@@ -548,7 +655,7 @@ def cmd_pull(args) -> int:
 
 
 def due_followups(store: Store) -> list:
-    return store.query("status='Applied' AND follow_up_at IS NOT NULL AND follow_up_at <= ?",
+    return store.query("status='Submitted' AND follow_up_at IS NOT NULL AND follow_up_at <= ?",
                        (date.today().isoformat(),), order="follow_up_at")
 
 
@@ -628,7 +735,8 @@ def hydrate_email_jobs(cfg: dict, store: Store, limit: int) -> int:
 
 
 def cmd_find(args) -> int:
-    """Everything mechanical for "find jobs", printing only a compact summary."""
+    """Everything mechanical for "find jobs"; prints only a compact review list."""
+    from .assess import extract_salary, link_status
     cfg = load_cfg()
     store = open_store()
     fcfg = cfg.get("find", {})
@@ -641,28 +749,101 @@ def cmd_find(args) -> int:
     n = hydrate_email_jobs(cfg, store, fcfg.get("email_jd_lookups", 6))
     print(f"\n## Email jobs: full JD found for {n}")
     score_pending(store, make_scorer(cfg))
-    print("\n## Prepare (score >= %d, top %d)" % (fcfg.get("prepare_min_score", 70), fcfg.get("prepare_top", 12)))
-    cmd_prepare(argparse.Namespace(keys=[], top=fcfg.get("prepare_top", 12), min=fcfg.get("prepare_min_score", 70)))
+
+    for r in store.query("status='New' AND coalesce(salary,'')=''"):
+        sal = extract_salary(r["description"])
+        if sal:
+            store.update(r["key"], salary=sal)
+    store.commit()
+
+    cands = review_candidates(store, cfg)
+    expired = 0
+    for r in cands:
+        if link_status(r["source"], r["url"]) is False:
+            set_status(store, r, "Skipped", note="posting expired or removed")
+            expired += 1
+    store.commit()
+    print(f"\n## Link check: {expired} expired posting(s) skipped")
+    sync(cfg, store)
     path = write_digest(store)
-    print(compact_summary(store))
+    print(compact_summary(store, cfg))
     print(f"(full digest: {path})")
     return 0
 
 
-def compact_summary(store: Store) -> str:
-    """One line per job to tailor, in the user's region priority: all Claude needs before reading each jd.txt."""
-    rows = store.query("status='Tailoring'", order="score DESC")
-    rows = by_priority(rows)
-    ready = store.query("status='Ready'")
-    lines = [f"\n=== TO TAILOR: {len(rows)} | Ready: {len(ready)} | follow-ups due: {len(due_followups(store))} "
-             f"| JSearch this month: {store.month_count('jsearch')} ==="]
-    for r in rows:
+def review_candidates(store: Store, cfg: dict) -> list:
+    """New jobs worth an AI review: rule score >= find.prepare_min_score, not reviewed yet, priority order."""
+    f = cfg.get("find", {})
+    rows = store.query("status='New' AND ai_score IS NULL AND score >= ?", (f.get("prepare_min_score", 70),))
+    return by_priority(rows, cfg["region_order"])[: f.get("prepare_top", 12)]
+
+
+def compact_summary(store: Store, cfg: dict | None = None) -> str:
+    """What Claude needs next, in the user's region priority: jobs to review, then jobs to tailor."""
+    cfg = cfg or load_cfg()
+    cands = review_candidates(store, cfg)
+    tailor = by_priority(store.query("status='Tailoring'"), cfg["region_order"])
+    ready = store.query("status IN ('Ready','Approved')")
+    lines = [f"\n=== TO REVIEW: {len(cands)} | TO TAILOR: {len(tailor)} | Ready: {len(ready)} | "
+             f"follow-ups due: {len(due_followups(store))} | JSearch this month: {store.month_count('jsearch')} ==="]
+
+    def line(r):
         jd_len = len(r["description"] or "")
         flags = "; ".join(x for x in [r["gaps"], r["notes"]] if x)
-        lines.append(f"{r['key'][:8]} {r['score']:>3} {(r['region'] or '?'):<6} {r['company'][:28]} | {r['title'][:50]} | "
-                     f"{(r['location'] or '')[:28]} | JD {jd_len}c{' (snippet)' if jd_len < 600 else ''}"
-                     + (f" | {flags[:120]}" if flags else ""))
+        score = r["ai_score"] if r["ai_score"] is not None else r["score"]
+        return (f"{r['key'][:8]} {score:>3} {(r['region'] or '?'):<6} {r['company'][:28]} | {r['title'][:50]} | "
+                f"{(r['location'] or '')[:28]} | {r['salary'] or '-'} | JD {jd_len}c{' (snippet)' if jd_len < 600 else ''}"
+                + (f" | {flags[:110]}" if flags else ""))
+    if cands:
+        lines.append("-- review: `jobpilot jd <keys>`, then `jobpilot assess --file <json>`")
+        lines += [line(r) for r in cands]
+    if tailor:
+        lines.append("-- tailor: write tailor.json, then `jobpilot build <keys>`")
+        lines += [line(r) for r in tailor]
     return "\n".join(lines)
+
+
+def cmd_jd(args) -> int:
+    """Print the essentials + JD text for review (compact: what Claude reads to assess)."""
+    store = open_store()
+    for ref in args.refs:
+        r = resolve(store, ref)
+        jd = (r["description"] or "").strip()
+        print(f"\n##### {r['key'][:8]} | {r['company']} | {r['title']} | {r['location']} | {r['work_mode']} | "
+              f"salary: {r['salary'] or '-'} | rule score {r['score']} | rule gaps: {r['gaps'] or '-'}\n{r['url']}")
+        print(jd[: args.max] + (f"\n[... {len(jd) - args.max} more chars]" if len(jd) > args.max else ""))
+    return 0
+
+
+def cmd_assess(args) -> int:
+    """Record AI assessments; strong matches are prepared for tailoring, weak ones skipped."""
+    from .assess import load_assessments
+    cfg, store, profile = load_cfg(), open_store(), load_profile()
+    f = cfg.get("find", {})
+    strong, floor = f.get("strong_match_score", 75), f.get("sheet_min_score", 60)
+    items = load_assessments(Path(args.file)) if args.file else [
+        {"key": args.key, "score": args.score, "why": args.why or "", "missing": args.missing or ""}]
+    for it in items:
+        r = resolve(store, it["key"])
+        store.update(r["key"], ai_score=int(it["score"]), match_explanation=it.get("why", ""), missing=it.get("missing", ""))
+        r = store.get(r["key"])
+        if it["score"] >= strong and r["status"] == "New":
+            try:
+                d = prepare(r, profile)
+                store.update(r["key"], status="Tailoring", cv_dir=str(d))
+                outcome = f"strong → prepared {d.name}"
+            except TailorError as e:
+                outcome = f"strong, but can't prepare: {e}"
+        elif it["score"] < floor and r["status"] == "New":
+            set_status(store, r, "Skipped", note=f"AI: weak match ({it['score']})")
+            outcome = "weak → skipped"
+        else:
+            outcome = "kept for the sheet, not tailored"
+        print(f"  {r['key'][:8]} {int(it['score']):>3}  {r['company'][:28]} - {r['title'][:40]}: {outcome}")
+    store.commit()
+    sync(cfg, store)
+    print(compact_summary(store, cfg))
+    return 0
 
 
 def cmd_build(args) -> int:
@@ -757,8 +938,13 @@ def sync(cfg: dict, store: Store) -> int:
     if not url or not token:
         print(f"\n(Sheet not configured: {len(rows)} row(s) queued in data/jobs.db; see README step 2.)")
         return 0
-    # Jobs skipped before they ever reached the sheet (blocklisted spam, etc.) stay local-only.
-    local_only = [r for r in rows if r["status"] == "Skipped" and not r["in_sheet"]]
+    # Only qualified jobs go to the sheet: anything past "New", or New with a good enough score.
+    # Jobs skipped/unqualified before they ever reached the sheet stay local-only.
+    min_score = cfg.get("find", {}).get("sheet_min_score", 60)
+    def qualified(r):
+        score = r["ai_score"] if r["ai_score"] is not None else r["score"]
+        return r["status"] not in ("New", "Skipped") or (score is not None and score >= min_score)
+    local_only = [r for r in rows if not r["in_sheet"] and not qualified(r)]
     local_keys = {r["key"] for r in local_only}
     rows = [r for r in rows if r["key"] not in local_keys]
     store.mark_synced([r["key"] for r in local_only], pushed=False)
@@ -815,7 +1001,7 @@ def main() -> int:
     z.add_argument("-v", "--verbose", action="store_true", help="print the keyword table")
     z.set_defaults(fn=cmd_finalize)
 
-    st = sub.add_parser("status", help="set a job's status, e.g. Applied")
+    st = sub.add_parser("status", help="set a job's status, e.g. Submitted")
     st.add_argument("ref")
     st.add_argument("status", choices=STATUSES)
     st.set_defaults(fn=cmd_status)
@@ -829,7 +1015,14 @@ def main() -> int:
     a.add_argument("--jd", required=True, help="file with the verbatim JD, or - for stdin")
     a.set_defaults(fn=cmd_add)
 
-    ap2 = sub.add_parser("apply", help="open Ready jobs in Chrome, pre-fill + attach CV (you click Submit)")
+    rv = sub.add_parser("review", help="show Ready jobs (or given keys) with everything you're approving")
+    rv.add_argument("keys", nargs="*")
+    rv.set_defaults(fn=cmd_review)
+    apv = sub.add_parser("approve", help="approve reviewed jobs for the apply step")
+    apv.add_argument("keys", nargs="+")
+    apv.set_defaults(fn=cmd_approve)
+
+    ap2 = sub.add_parser("apply", help="open APPROVED jobs pre-filled with CV + cover letter; you click Submit; status recorded")
     ap2.add_argument("keys", nargs="*", help="job keys (prefix ok); default = best Ready jobs")
     ap2.add_argument("-n", type=int, default=20, help="max jobs this session")
     ap2.add_argument("--plan", action="store_true", help="headless dry run: show what would be filled, type nothing")
@@ -840,6 +1033,17 @@ def main() -> int:
     fd = sub.add_parser("followed", help="log that you sent a follow-up")
     fd.add_argument("ref")
     fd.set_defaults(fn=cmd_followed)
+    j = sub.add_parser("jd", help="print a job's essentials + description (for the AI review)")
+    j.add_argument("refs", nargs="+")
+    j.add_argument("--max", type=int, default=6000, help="max JD characters to print")
+    j.set_defaults(fn=cmd_jd)
+    asx = sub.add_parser("assess", help="record AI score + explanation + missing requirements")
+    asx.add_argument("--file", help='JSON: [{"key","score","why","missing"}, ...]')
+    asx.add_argument("--key")
+    asx.add_argument("--score", type=int)
+    asx.add_argument("--why")
+    asx.add_argument("--missing")
+    asx.set_defaults(fn=cmd_assess)
     sub.add_parser("find", help="everything for 'find jobs': pull, all sources + Gmail, clean, score, prepare, compact summary").set_defaults(fn=cmd_find)
     sub.add_parser("daily", help="alias of find").set_defaults(fn=cmd_find)
     b = sub.add_parser("build", help="tailor.json -> cv.html (base-CV design) -> finalize")

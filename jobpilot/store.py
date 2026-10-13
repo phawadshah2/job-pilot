@@ -38,6 +38,12 @@ MIGRATIONS = {
     "follow_up_at": "TEXT",
     "in_sheet": "INTEGER NOT NULL DEFAULT 0",   # has this row ever reached the sheet?
     "region": "TEXT",
+    "ai_score": "INTEGER",          # Claude's assessment (0-100); used instead of the rule score once set
+    "match_explanation": "TEXT",    # why it fits, in a sentence or two
+    "missing": "TEXT",              # requirements the candidate doesn't meet
+    "cv_pdf": "TEXT",
+    "cover_pdf": "TEXT",
+    "approved_at": "TEXT",
 }
 
 
