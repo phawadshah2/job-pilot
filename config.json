@@ -51,7 +51,9 @@
   "find": {
     "prepare_top": 12,
     "prepare_min_score": 70,
-    "email_jd_lookups": 6
+    "email_jd_lookups": 6,
+    "sheet_min_score": 60,
+    "strong_match_score": 75
   },
   "region_catalog": {
     "_why": "Regions a user can pick (in priority order) during `jobpilot setup`. patterns = location words; jsearch = searches run for that region.",

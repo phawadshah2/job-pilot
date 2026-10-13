@@ -301,6 +301,30 @@ def s_answers(app: dict, user: dict, cv: dict) -> dict:
     return app
 
 
+def ask_app_password() -> str:
+    """Hidden input gives no feedback, so confirm the length (a Google app password is 16 letters)."""
+    while True:
+        pw = getpass.getpass("  App password (hidden, paste ONCE then Enter; Enter alone keeps the current one): ")
+        pw = pw.replace(" ", "").strip()
+        if not pw:
+            return ""
+        if len(pw) == 16 and pw.isalpha():
+            print("  ✓ received 16 letters")
+            return pw
+        print(f"  ✗ received {len(pw)} characters; a Google app password is exactly 16 letters"
+              + (" (looks like it was pasted more than once)" if len(pw) % 16 == 0 else "") + ". Try again.")
+
+
+def ask_webhook_url(current: str = "") -> str:
+    """The Apps Script web app URL; a stray "y" here once replaced a working URL."""
+    while True:
+        url = ask("  Web app URL (ends with /exec; Enter keeps the current one)", current)
+        if url.startswith("https://script.google.com/") and url.rstrip("/").endswith("/exec"):
+            return url.rstrip("/")
+        print("  ✗ that isn't a web app URL. Copy it from Deploy > Manage deployments: "
+              "https://script.google.com/macros/s/.../exec")
+
+
 def s_connect() -> None:
     print("\n== Connections (stored only in ~/.job-pilot/.env) ==")
     from .config import load_env
@@ -312,10 +336,10 @@ def s_connect() -> None:
         token = env.get("SHEET_TOKEN") or secrets.token_urlsafe(24)
         print(f"  In Apps Script > Project Settings > Script properties, set TOKEN to:\n    {token}")
         updates["SHEET_TOKEN"] = token
-        updates["SHEET_WEBHOOK_URL"] = ask("  Web app URL (ends with /exec)", env.get("SHEET_WEBHOOK_URL", ""))
+        updates["SHEET_WEBHOOK_URL"] = ask_webhook_url(env.get("SHEET_WEBHOOK_URL", ""))
     if ask_yes("Read job-alert emails from Gmail? (needs a Google app password)", bool(env.get("GMAIL_ADDRESS"))):
         updates["GMAIL_ADDRESS"] = ask("  Gmail address", env.get("GMAIL_ADDRESS", ""))
-        updates["GMAIL_APP_PASSWORD"] = getpass.getpass("  App password (hidden; Enter to keep): ").strip()
+        updates["GMAIL_APP_PASSWORD"] = ask_app_password()
     write_env(updates)
 
 

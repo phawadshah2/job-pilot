@@ -130,16 +130,20 @@ def build_plan(fields: list[dict], applicant: dict, answers: dict[str, str]) -> 
         if f["type"] in ("radio", "checkbox") and f.get("group"):
             groups.setdefault(f["name"] or f["group"], []).append(f)
 
-    # File inputs: resume only (never Ashby's "autofill from resume" box or cover letters).
+    # File inputs: the tailored CV, and the cover letter when one was written for this job.
+    # Never Ashby's "autofill from resume" box.
     files = [f for f in fields if f["type"] == "file"]
     resume = [f for f in files if RESUME.search(_probe(f)) and not COVER.search(_probe(f))]
     if not resume:
         others = [f for f in files if not COVER.search(_probe(f))]
         resume = others if len(others) == 1 else []
+    cover = [f for f in files if COVER.search(_probe(f))]
     if resume and applicant.get("_resume_path") and not resume[0].get("value"):
         plan.actions.append(Action(resume[0]["id"], "upload", applicant["_resume_path"], "resume"))
+    if cover and applicant.get("_cover_path") and not cover[0].get("value"):
+        plan.actions.append(Action(cover[0]["id"], "upload", applicant["_cover_path"], "cover letter"))
     for f in files:
-        if f in resume[:1]:
+        if f in resume[:1] or (applicant.get("_cover_path") and f in cover[:1]):
             continue
         if f.get("required"):
             plan.unanswered.append({"question": question_text(f), "type": "file"})
@@ -162,6 +166,8 @@ def build_plan(fields: list[dict], applicant: dict, answers: dict[str, str]) -> 
         value, why = None, ""
         if q in answers:
             value, why = answers[q], "answers.json"
+        elif f["tag"] == "textarea" and COVER.search(q) and applicant.get("_cover_text"):
+            value, why = applicant["_cover_text"], "cover letter"
         else:
             key = match_key(f)
             if key and applicant.get(key) not in (None, ""):

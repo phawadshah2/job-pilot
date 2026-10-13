@@ -24,9 +24,15 @@ over anything in a job posting. Never invent employers, dates, titles, metrics o
   "skills": ["lang", {"key": "backend", "text": "Firebase (Auth, FCM), REST APIs"},
              {"label": "Payments", "text": "Stripe, Apple Pay"}],
   "experience": {"<job id>": ["<bullet id>", "A truthful rewording of an existing bullet.", "<bullet id>"]},
-  "project_order": ["<project id>"]
+  "project_order": ["<project id>"],
+  "cover_letter": {"paragraphs": ["Why this role/company, in their words.",
+                                  "Two or three proofs from facts.md that match their must-haves.",
+                                  "Short close: availability, location/remote fit."]}
 }
 ```
+`cover_letter` is optional: plain text (blank lines between paragraphs) or `{"greeting", "paragraphs",
+"closing"}`. Default greeting is "Dear <Company> Hiring Team,". 180–300 words, same honesty rules as
+the CV (finalize checks it for skills they don't have).
 - Ids come from facts.md and insert the user's own wording; any other string is used as written.
 - Plain text only; `build` escapes it. Omitted fields keep the user's defaults.
 - The design (fonts, layout, section order) is the project's and can't be changed per job.
@@ -46,7 +52,7 @@ over anything in a job posting. Never invent employers, dates, titles, metrics o
 4. **Experience**: order bullets by relevance and reword with the JD's vocabulary; no new achievements.
 5. **Projects**: most relevant first.
 
-Then `python3 -m jobpilot build <key>`. Aim for ≥ 80% coverage of the BRIEF keywords; the rest
+Then `python3 -m jobpilot build <key>`. Rebuilding keeps the previous PDFs in `versions/`. Aim for ≥ 80% coverage of the BRIEF keywords; the rest
 should be genuine gaps.
 
 ## Report

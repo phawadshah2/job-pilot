@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import paths
-from .cv.render import head, render
+from .cv.render import head, render, render_cover
 from .scoring import Lexicon
 from .text import html_to_text
 
@@ -114,12 +114,37 @@ Write tailor.json in this folder (see TAILOR.md), then:
 
 
 def build(job_dir: Path) -> Path:
+    """tailor.json -> cv.html (+ cover.html when the spec has a cover_letter)."""
+    from datetime import date
     spec_p = job_dir / "tailor.json"
     if not spec_p.exists():
         raise TailorError(f"no tailor.json in {job_dir}")
+    spec = json.loads(spec_p.read_text())
+    cv = load_cv()
     out = job_dir / "cv.html"
-    out.write_text(render(load_cv(), json.loads(spec_p.read_text())))
+    out.write_text(render(cv, spec))
+    cover = job_dir / "cover.html"
+    if spec.get("cover_letter"):
+        meta = json.loads((job_dir / "job.json").read_text())
+        cover.write_text(render_cover(cv, spec["cover_letter"], meta["company"], meta["title"],
+                                      date.today().strftime("%d %B %Y")))
+    elif cover.exists():
+        cover.unlink()  # spec no longer asks for one
     return out
+
+
+def _archive(files: list[Path], job_dir: Path) -> None:
+    """Keep earlier versions instead of overwriting: <job>/versions/<name> v1.pdf, v2 ..."""
+    existing = [f for f in files if f.exists()]
+    if not existing:
+        return
+    vdir = job_dir / "versions"
+    vdir.mkdir(exist_ok=True)
+    n = 1
+    while any((vdir / f"{f.stem} v{n}{f.suffix}").exists() for f in existing):
+        n += 1
+    for f in existing:
+        f.rename(vdir / f"{f.stem} v{n}{f.suffix}")
 
 
 # --------------------------------------------------------------- finalize --
@@ -128,6 +153,7 @@ def build(job_dir: Path) -> Path:
 class FinalizeReport:
     cv_pdf: Path
     jd_pdf: Path
+    cover_pdf: Path | None
     pages: int
     old_cov: int
     new_cov: int
@@ -184,14 +210,29 @@ def finalize(job_dir: Path, profile: dict) -> FinalizeReport:
     violations = check_boundaries(cv_html, profile)
     if violations:
         raise TailorError("CV claims skills outside the verified boundaries:\n  " + "\n  ".join(violations))
+    cover_html_path = job_dir / "cover.html"
+    if cover_html_path.exists():
+        bad = check_boundaries(cover_html_path.read_text(), profile)
+        if bad:
+            raise TailorError("Cover letter claims skills outside the verified boundaries:\n  " + "\n  ".join(bad))
 
     label = meta["label"]
     cv_pdf = job_dir / f"{label}.pdf"
     jd_pdf_path = job_dir / f"{label} - JD.pdf"
+    cover_pdf = job_dir / f"{label} - Cover Letter.pdf"
+    used_spec = job_dir / "tailor.final.json"   # the spec the current PDFs were built from
+    _archive([cv_pdf, cover_pdf, used_spec], job_dir)
 
     # virtual-time-budget lets the Inter web font finish loading before printing.
     _run([find_chrome(), "--headless", "--disable-gpu", "--no-pdf-header-footer", "--virtual-time-budget=10000",
           f"--print-to-pdf={cv_pdf}", cv_html_path.resolve().as_uri()], "Chrome (CV)")
+    if cover_html_path.exists():
+        _run([find_chrome(), "--headless", "--disable-gpu", "--no-pdf-header-footer", "--virtual-time-budget=10000",
+              f"--print-to-pdf={cover_pdf}", cover_html_path.resolve().as_uri()], "Chrome (cover letter)")
+    else:
+        cover_pdf = None
+    if (job_dir / "tailor.json").exists():
+        shutil.copyfile(job_dir / "tailor.json", used_spec)
     try:
         jd_pdf.make(str(job_dir / "jd.txt"), meta["company"], meta["title"], str(jd_pdf_path))
     except (subprocess.CalledProcessError, OSError) as e:
@@ -216,7 +257,7 @@ def finalize(job_dir: Path, profile: dict) -> FinalizeReport:
 
     table, old_cov, new_cov = coverage(meta["keywords"], html_to_text(default), new_text)
     (job_dir / "coverage.txt").write_text(table + "\n")
-    return FinalizeReport(cv_pdf, jd_pdf_path, pages, old_cov, new_cov, table, warnings)
+    return FinalizeReport(cv_pdf, jd_pdf_path, cover_pdf, pages, old_cov, new_cov, table, warnings)
 
 
 def coverage(keywords: list[str], old: str, new: str) -> tuple[str, int, int]:
