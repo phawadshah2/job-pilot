@@ -53,11 +53,11 @@
     ]
   },
   "find": {
-    "prepare_top": 12,
-    "prepare_min_score": 70,
-    "email_jd_lookups": 6,
-    "sheet_min_score": 60,
-    "strong_match_score": 75
+    "_why": "find lists up to list_max new jobs scoring >= list_min_score for review; reviewed jobs >= keep_min_score are suggested to keep. You pick; only kept jobs reach the sheet.",
+    "list_min_score": 50,
+    "list_max": 30,
+    "keep_min_score": 60,
+    "email_jd_lookups": 6
   },
   "region_catalog": {
     "_why": "Regions a user can pick (in priority order) during `jobpilot setup`. patterns = location words; jsearch = searches run for that region.",

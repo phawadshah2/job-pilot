@@ -67,7 +67,7 @@ class SyncTest(unittest.TestCase):
     def test_skipped_before_reaching_sheet_stays_local(self):
         spam, real, was_pushed = job("vmysmartpros"), job("Careem"), job("Tabby")
         s = store_with(spam, real, was_pushed)
-        s.update(real.key, score=80)
+        s.update(real.key, score=80, status="Approved")   # you kept it
         s.mark_synced([was_pushed.key])                    # already in the sheet
         s.update(spam.key, status="Skipped")
         s.update(was_pushed.key, status="Skipped")         # you skipped it later: sheet must hear about it
@@ -82,23 +82,23 @@ class SyncTest(unittest.TestCase):
 
 
 class QualifiedOnlyTest(unittest.TestCase):
-    def test_low_score_new_jobs_stay_local_progressed_ones_go(self):
-        low, good, tailored = job("Low"), job("Good"), job("Tailored")
-        s = store_with(low, good, tailored)
+    def test_only_jobs_you_kept_go_to_the_sheet(self):
+        low, good, kept = job("Low"), job("Good"), job("Kept")
+        s = store_with(low, good, kept)
         s.update(low.key, score=40)
-        s.update(good.key, score=72)
-        s.update(tailored.key, score=40, ai_score=55, status="Tailoring")
+        s.update(good.key, score=92, ai_score=90)          # great, but you haven't picked it yet
+        s.update(kept.key, score=40, ai_score=55, status="Approved")
         s.commit()
-        with mock.patch.object(cli.sheet, "push", return_value=(2, 0)) as push:
+        with mock.patch.object(cli.sheet, "push", return_value=(1, 0)) as push:
             cli.sync(CFG, s)
-        self.assertEqual({r["key"] for r in push.call_args[0][2]}, {good.key, tailored.key})
+        self.assertEqual({r["key"] for r in push.call_args[0][2]}, {kept.key})
 
 
 class SheetErrorTest(unittest.TestCase):
     def test_google_html_error_page_becomes_clear_message_and_rows_stay_queued(self):
         j = job("Careem")
         s = store_with(j)
-        s.update(j.key, score=80)
+        s.update(j.key, score=80, status="Approved")
         s.commit()
         with mock.patch("jobpilot.sheet.post_json", side_effect=json.JSONDecodeError("Expecting value", "<html>", 0)):
             self.assertEqual(cli.sync(CFG, s), 1)
@@ -111,7 +111,7 @@ class CompactSummaryTest(unittest.TestCase):
         a, b, c = job("UK Co"), job("Dubai Co"), job("Riyadh Co")
         s = store_with(a, b, c)
         for j, region, score in ((a, "uk", 95), (b, "uae", 80), (c, "gcc", 90)):
-            s.update(j.key, status="Tailoring", region=region, score=score, description="x" * 700)
+            s.update(j.key, region=region, score=score, description="x" * 700)  # New, not reviewed yet
         s.commit()
         lines = [l for l in cli.compact_summary(s).splitlines() if l[:8] in (a.key[:8], b.key[:8], c.key[:8])]
         self.assertEqual([l.split()[3] for l in lines], ["Dubai", "Riyadh", "UK"])

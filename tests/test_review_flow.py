@@ -68,8 +68,8 @@ class AssessHelpersTest(unittest.TestCase):
             load_assessments(p)
 
 
-class AssessCommandTest(unittest.TestCase):
-    def test_strong_prepared_middle_kept_weak_skipped(self):
+class AssessAndPickTest(unittest.TestCase):
+    def test_assess_records_only_then_your_pick_decides(self):
         store = cli.open_store()
         strong, mid, weak = (stored(store, c) for c in ("StrongCo", "MidCo", "WeakCo"))
         f = Path(tempfile.mkdtemp()) / "a.json"
@@ -77,14 +77,22 @@ class AssessCommandTest(unittest.TestCase):
             {"key": strong, "score": 88, "why": "Exact Flutter + BLoC match in Dubai.", "missing": "GraphQL"},
             {"key": mid, "score": 68, "why": "Good stack, but lead role.", "missing": "8+ yrs"},
             {"key": weak, "score": 40, "why": "Mostly native iOS.", "missing": "Swift"}]))
-        with mock.patch.object(cli, "sync", return_value=0):
+        with mock.patch.object(cli, "sync", return_value=0) as sync, mock.patch("builtins.print"):
             cli.cmd_assess(mock.Mock(file=str(f)))
+            self.assertFalse(sync.called)                      # nothing reaches the sheet before you pick
+            s = cli.open_store()
+            self.assertEqual({s.get(k)["status"] for k in (strong, mid, weak)}, {"New"})
+            self.assertEqual((s.get(strong)["ai_score"], s.get(strong)["missing"]), (88, "GraphQL"))
+            cli.cmd_pick(mock.Mock(keys=[strong[:8], weak]))  # you keep one I'd have skipped, drop one I'd keep
+            self.assertTrue(sync.called)
         s = cli.open_store()
-        self.assertEqual(s.get(strong)["status"], "Tailoring")
-        self.assertTrue((Path(s.get(strong)["cv_dir"]) / "jd.txt").exists())
-        self.assertEqual((s.get(strong)["ai_score"], s.get(strong)["missing"]), (88, "GraphQL"))
-        self.assertEqual(s.get(mid)["status"], "New")
-        self.assertEqual(s.get(weak)["status"], "Skipped")
+        self.assertEqual([s.get(k)["status"] for k in (strong, mid, weak)], ["Approved", "Skipped", "Approved"])
+        self.assertIn("you skipped it", s.get(mid)["notes"])
+
+    def test_tailoring_at_apply_time_keeps_approved(self):
+        self.assertEqual(cli._forward("Approved", "Tailoring"), "Approved")
+        self.assertEqual(cli._forward("Approved", "Ready"), "Approved")
+        self.assertEqual(cli._forward("New", "Tailoring"), "Tailoring")
 
 
 class ApprovalGateTest(unittest.TestCase):

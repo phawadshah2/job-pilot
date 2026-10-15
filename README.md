@@ -45,21 +45,24 @@ fictional profile.
 | **Gmail app password** (optional) | Reads LinkedIn/Indeed job-alert emails for free, marks them read | Google Account → Security → 2-Step Verification → App passwords |
 
 ## Use
-With Claude Code in this folder, say **"find jobs"**, then later **"apply"** (playbook: [FIND.md](FIND.md)).
+With Claude Code in this folder, say **"find jobs"**: you get every reviewed job in one list, tick the
+ones to keep, and only those go to the sheet. Then say **"apply"**: one job at a time, a tailored CV
+(and cover letter) plus the link and ready answers; you apply and say "done" (playbook: [FIND.md](FIND.md)).
 By hand:
 ```bash
 python3 -m jobpilot find                    # collect + clean + pre-score; prints jobs to review
 python3 -m jobpilot jd <key>...             # read a candidate's JD
-python3 -m jobpilot assess --file a.json    # record AI score/explanation/missing; strong ones get prepared
-python3 -m jobpilot build <key>...          # tailor.json -> CV (+ cover letter) PDFs, status Ready
-python3 -m jobpilot review                  # everything you're about to approve
-python3 -m jobpilot approve <key>...        # approve for applying
-.venv/bin/python -m jobpilot apply          # pre-fill approved jobs; you click Submit; status recorded
+python3 -m jobpilot assess --file a.json    # record AI score/explanation/missing (no status change)
+python3 -m jobpilot pick <keep keys>...     # your choice: kept -> Approved + sheet, the rest skipped
+python3 -m jobpilot next                    # the next job to apply to
+python3 -m jobpilot prepare <key>           # job folder for tailoring
+python3 -m jobpilot build <key>             # tailor.json -> CV (+ cover letter) PDFs
+python3 -m jobpilot status <key> Submitted  # after you applied (or Pending / Failed / Skipped)
 python3 -m jobpilot followups               # applications due for a follow-up
 python3 -m jobpilot sheet-reset             # empty the Google Sheet (asks first)
 ```
-Statuses: New → Tailoring → Ready → Approved → Pending / Failed / Manual action required → **Submitted**
-(only after the site's confirmation page or your explicit confirmation) → Interview → Offer / Rejected / Skipped.
+Statuses: New → Approved (you kept it) → Pending / Failed / Manual action required → **Submitted**
+(only after you confirm) → Interview → Offer / Rejected / Skipped.
 
 ## Where jobs come from, and where you apply
 Every job's link is sorted (`jobpilot/sites.py`) and shown in the sheet's **Apply via** column:

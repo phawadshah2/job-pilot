@@ -232,7 +232,7 @@ def cmd_prepare(args) -> int:
         notes = r["notes"] or ""
         if prior and "applied before" not in notes:
             notes = "; ".join(x for x in [notes, "applied before: " + ", ".join(prior)] if x)
-        store.update(r["key"], status="Tailoring", cv_dir=str(d), notes=notes)
+        store.update(r["key"], status=_forward(r["status"], "Tailoring"), cv_dir=str(d), notes=notes)
         print(f"  {r['score']:>3}  {r['key'][:8]}  {d}")
         if prior:
             print(f"       ⚠ same company before: {', '.join(prior)}")
@@ -275,7 +275,7 @@ def cmd_finalize(args) -> int:
             rc = 1
             continue
         ready = rep.pages <= 2
-        store.update(r["key"], status="Ready" if ready else "Tailoring", cv_dir=str(rep.cv_pdf.parent),
+        store.update(r["key"], status=_forward(r["status"], "Ready" if ready else "Tailoring"), cv_dir=str(rep.cv_pdf.parent),
                      cv_pdf=str(rep.cv_pdf), cover_pdf=str(rep.cover_pdf) if rep.cover_pdf else None)
         print(f"{'✓' if ready else '…'} {r['company']} - {r['title']}{'' if ready else '  (still Tailoring: over 2 pages)'}")
         rc = rc if ready else 1
@@ -300,6 +300,11 @@ def cmd_status(args) -> int:
     store.commit()
     print(f"{r['company']} - {r['title']}: {r['status']} → {args.status}")
     return sync(load_cfg(), store)
+
+
+def _forward(current: str, new: str) -> str:
+    """Never move a job backwards: an Approved job being tailored at apply time stays Approved."""
+    return new if status_mod.can_move(current, new) else current
 
 
 def set_status(store: Store, r, status: str, note: str = "") -> None:
@@ -773,7 +778,6 @@ def cmd_find(args) -> int:
             expired += 1
     store.commit()
     print(f"\n## Link check: {expired} expired posting(s) skipped")
-    sync(cfg, store)
     path = write_digest(store)
     print(compact_summary(store, cfg))
     print(f"(full digest: {path})")
@@ -781,19 +785,24 @@ def cmd_find(args) -> int:
 
 
 def review_candidates(store: Store, cfg: dict) -> list:
-    """New jobs worth an AI review: rule score >= find.prepare_min_score, not reviewed yet, priority order."""
+    """New jobs worth an AI review: rule score >= find.list_min_score, not reviewed yet, priority order."""
     f = cfg.get("find", {})
-    rows = store.query("status='New' AND ai_score IS NULL AND score >= ?", (f.get("prepare_min_score", 70),))
-    return by_priority(rows, cfg["region_order"])[: f.get("prepare_top", 12)]
+    rows = store.query("status='New' AND ai_score IS NULL AND score >= ?", (f.get("list_min_score", 50),))
+    return by_priority(rows, cfg["region_order"])[: f.get("list_max", 30)]
+
+
+def reviewed(store: Store, cfg: dict) -> list:
+    """Reviewed jobs waiting for the user's pick, priority order."""
+    return by_priority(store.query("status='New' AND ai_score IS NOT NULL"), cfg["region_order"])
 
 
 def compact_summary(store: Store, cfg: dict | None = None) -> str:
     """What Claude needs next, in the user's region priority: jobs to review, then jobs to tailor."""
     cfg = cfg or load_cfg()
     cands = review_candidates(store, cfg)
-    tailor = by_priority(store.query("status='Tailoring'"), cfg["region_order"])
-    ready = store.query("status IN ('Ready','Approved')")
-    lines = [f"\n=== TO REVIEW: {len(cands)} | TO TAILOR: {len(tailor)} | Ready: {len(ready)} | "
+    picks = reviewed(store, cfg)
+    to_apply = store.query("status IN ('Approved','Tailoring','Ready','Pending')")
+    lines = [f"\n=== TO REVIEW: {len(cands)} | WAITING FOR YOUR PICK: {len(picks)} | TO APPLY: {len(to_apply)} | "
              f"follow-ups due: {len(due_followups(store))} | JSearch this month: {store.month_count('jsearch')} ==="]
 
     def line(r):
@@ -806,9 +815,9 @@ def compact_summary(store: Store, cfg: dict | None = None) -> str:
     if cands:
         lines.append("-- review: `jobpilot jd <keys>`, then `jobpilot assess --file <json>`")
         lines += [line(r) for r in cands]
-    if tailor:
-        lines.append("-- tailor: write tailor.json, then `jobpilot build <keys>`")
-        lines += [line(r) for r in tailor]
+    if picks:
+        lines.append("-- show these to the user to pick, then `jobpilot pick <kept keys>`")
+        lines += [line(r) + f" | {r['match_explanation'] or ''}"[:60] for r in picks]
     return "\n".join(lines)
 
 
@@ -825,33 +834,54 @@ def cmd_jd(args) -> int:
 
 
 def cmd_assess(args) -> int:
-    """Record AI assessments; strong matches are prepared for tailoring, weak ones skipped."""
+    """Record AI assessments (score, why, missing). Nothing changes status: the user picks next."""
     from .assess import load_assessments
-    cfg, store, profile = load_cfg(), open_store(), load_profile()
-    f = cfg.get("find", {})
-    strong, floor = f.get("strong_match_score", 75), f.get("sheet_min_score", 60)
+    cfg, store = load_cfg(), open_store()
+    keep_min = cfg.get("find", {}).get("keep_min_score", 60)
     items = load_assessments(Path(args.file)) if args.file else [
         {"key": args.key, "score": args.score, "why": args.why or "", "missing": args.missing or ""}]
     for it in items:
         r = resolve(store, it["key"])
         store.update(r["key"], ai_score=int(it["score"]), match_explanation=it.get("why", ""), missing=it.get("missing", ""))
-        r = store.get(r["key"])
-        if it["score"] >= strong and r["status"] == "New":
-            try:
-                d = prepare(r, profile)
-                store.update(r["key"], status="Tailoring", cv_dir=str(d))
-                outcome = f"strong → prepared {d.name}"
-            except TailorError as e:
-                outcome = f"strong, but can't prepare: {e}"
-        elif it["score"] < floor and r["status"] == "New":
-            set_status(store, r, "Skipped", note=f"AI: weak match ({it['score']})")
-            outcome = "weak → skipped"
-        else:
-            outcome = "kept for the sheet, not tailored"
-        print(f"  {r['key'][:8]} {int(it['score']):>3}  {r['company'][:28]} - {r['title'][:40]}: {outcome}")
+        tip = "suggest KEEP" if it["score"] >= keep_min else "suggest skip"
+        print(f"  {r['key'][:8]} {int(it['score']):>3}  {r['company'][:28]} - {r['title'][:40]}: {tip}")
     store.commit()
-    sync(cfg, store)
     print(compact_summary(store, cfg))
+    return 0
+
+
+def cmd_pick(args) -> int:
+    """The user's choice: kept jobs -> Approved (and into the sheet); every other reviewed job -> Skipped (local only)."""
+    cfg, store = load_cfg(), open_store()
+    kept = {resolve(store, k)["key"] for k in args.keys}
+    today = date.today().isoformat()
+    n_skip = 0
+    for k in kept:
+        r = store.get(k)
+        if r["status"] in ("New", "Skipped"):
+            store.update(k, status="Approved", approved_at=today)
+        print(f"  ✓ keep   {k[:8]} {r['company'][:28]} - {r['title'][:50]}")
+    for r in reviewed(store, cfg):
+        if r["key"] not in kept:
+            set_status(store, r, "Skipped", note="you skipped it")
+            n_skip += 1
+    store.commit()
+    print(f"{len(kept)} kept, {n_skip} skipped.")
+    sync(cfg, store)
+    return 0
+
+
+def cmd_next(args) -> int:
+    """The next job to apply to (priority order), with everything needed to apply."""
+    cfg, store = load_cfg(), open_store()
+    rows = by_priority(store.query("status IN ('Approved','Tailoring','Ready','Pending')"), cfg["region_order"])
+    if args.ref:
+        rows = [resolve(store, args.ref)]
+    if not rows:
+        print("Nothing left to apply to. Say \"find jobs\" for more.")
+        return 0
+    cmd_review(argparse.Namespace(keys=[rows[0]["key"]]))
+    print(f"\n({len(rows) - 1} more after this one)")
     return 0
 
 
@@ -871,24 +901,6 @@ def cmd_build(args) -> int:
     if not ok:
         return 1
     return cmd_finalize(argparse.Namespace(refs=ok, verbose=args.verbose))
-
-
-def cmd_daily(args) -> int:
-    """The unattended morning run (minus tailoring, which Claude does per TAILOR.md)."""
-    cfg = load_cfg()
-    store = open_store()
-    d = cfg.get("daily", {})
-    print("## 1. Pull status changes from the sheet")
-    pull(cfg, store)
-    print("\n## 2. Fetch + score")
-    cmd_fetch(argparse.Namespace(dry_run=False, why=False, only=None))
-    print("\n## 3. Clean (blocklist)")
-    cmd_clean(None)
-    print("\n## 4. Prepare the best matches for tailoring")
-    cmd_prepare(argparse.Namespace(keys=[], top=d.get("prepare_top", 10), min=d.get("prepare_min_score", 60)))
-    path = write_digest(store)
-    print(f"\nDigest: {path}")
-    return 0
 
 
 def write_digest(store: Store) -> Path:
@@ -947,15 +959,10 @@ def sync(cfg: dict, store: Store) -> int:
     if not url or not token:
         print(f"\n(Sheet not configured: {len(rows)} row(s) queued in data/jobs.db; see README step 2.)")
         return 0
-    # Only qualified jobs go to the sheet: anything past "New" (except Skipped), or New with a good
-    # enough score. Jobs skipped/unqualified before they ever reached the sheet stay local-only;
-    # rows already in the sheet keep getting their updates (e.g. -> Skipped).
-    min_score = cfg.get("find", {}).get("sheet_min_score", 60)
+    # Only jobs you kept go to the sheet (anything past "New", except Skipped). New and skipped jobs
+    # stay local-only; rows already in the sheet keep getting their updates (e.g. -> Submitted).
     def qualified(r):
-        score = r["ai_score"] if r["ai_score"] is not None else r["score"]
-        if r["status"] == "Skipped":
-            return False
-        return r["status"] != "New" or (score is not None and score >= min_score)
+        return r["status"] not in ("New", "Skipped")
     local_only = [r for r in rows if not r["in_sheet"] and not qualified(r)]
     local_keys = {r["key"] for r in local_only}
     rows = [r for r in rows if r["key"] not in local_keys]
@@ -1056,7 +1063,13 @@ def main() -> int:
     asx.add_argument("--why")
     asx.add_argument("--missing")
     asx.set_defaults(fn=cmd_assess)
-    sub.add_parser("find", help="everything for 'find jobs': pull, all sources + Gmail, clean, score, prepare, compact summary").set_defaults(fn=cmd_find)
+    sub.add_parser("find", help="everything for 'find jobs': pull, all sources + Gmail, clean, score, list jobs to review").set_defaults(fn=cmd_find)
+    pk = sub.add_parser("pick", help="your choice after review: keep these keys (-> Approved, sheet); the rest are skipped")
+    pk.add_argument("keys", nargs="*")
+    pk.set_defaults(fn=cmd_pick)
+    nx = sub.add_parser("next", help="the next job to apply to, with link, CV and answers")
+    nx.add_argument("ref", nargs="?")
+    nx.set_defaults(fn=cmd_next)
     sub.add_parser("daily", help="alias of find").set_defaults(fn=cmd_find)
     b = sub.add_parser("build", help="tailor.json -> cv.html (base-CV design) -> finalize")
     b.add_argument("refs", nargs="+")
