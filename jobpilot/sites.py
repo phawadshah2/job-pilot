@@ -67,7 +67,7 @@ SITES: list[tuple[str, str, str]] = [
                                  r"expatriates\.com|grabjobs\.co|jobzmall\.com|tealhq\.com|"
                                  r"jobsinkuwait\.com|gulfjobs\.[a-z.]+|bossjob\.[a-z.]+|uaejobs\.[a-z.]+|"
                                  r"khaleejtimes\.com|jobs\.ae|careers24\.com|drjobpro\.com|hirelateral\.com|"
-                                 r"clickajobs\.com|jobisite\.com|virtualvocations\.com|flexjobs\.com)$"),
+                                 r"clickajobs\.com|jobisite\.com|virtualvocations\.com|flexjobs\.com|jaabz\.com)$"),
 ]
 _COMPILED = [(k, n, re.compile(p, re.I)) for k, n, p in SITES]
 
