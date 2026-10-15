@@ -5,7 +5,9 @@ companies can embed their job lists. Add company slugs in config.json.
 """
 from __future__ import annotations
 
-from ..http import HTTPError, get_json, post_json
+import xml.etree.ElementTree as ET
+
+from ..http import HTTPError, get_json, get_text, post_json
 from ..models import Job
 from ..text import html_to_text, parse_date
 
@@ -128,10 +130,83 @@ def smartrecruiters(cfg: dict) -> list[Job]:
     return jobs
 
 
+def recruitee(cfg: dict) -> list[Job]:
+    jobs: list[Job] = []
+    for slug in cfg["companies"].get("recruitee", []):
+        data = _safe(lambda: get_json(f"https://{slug}.recruitee.com/api/offers/"), slug)
+        for j in (data or {}).get("offers", []):
+            jobs.append(Job(
+                source=f"recruitee:{slug}",
+                title=j.get("title", ""),
+                company=j.get("company_name") or slug.title(),
+                url=j.get("careers_url", ""),
+                apply_url=j.get("careers_apply_url", ""),
+                location=j.get("location", "") or ", ".join(x for x in (j.get("city"), j.get("country")) if x),
+                remote=bool(j.get("remote")),
+                posted_at=parse_date(j.get("published_at")),
+                description=html_to_text((j.get("description") or "") + (j.get("requirements") or "")),
+                employment_type=j.get("employment_type_code", "") or "",
+                notes=["hybrid"] if j.get("hybrid") else [],
+            ))
+    return jobs
+
+
+TT = "{https://teamtailor.com/locations}"
+
+
+def teamtailor(cfg: dict) -> list[Job]:
+    """Teamtailor's public RSS feed (Property Finder, dubizzle, ...)."""
+    jobs: list[Job] = []
+    for slug in cfg["companies"].get("teamtailor", []):
+        xml = _safe(lambda: get_text(f"https://{slug}.teamtailor.com/jobs.rss"), slug)
+        if not xml:
+            continue
+        channel = ET.fromstring(xml).find("channel")
+        company = (channel.findtext("title") or slug.title()) if channel is not None else slug.title()
+        for it in channel.findall("item") if channel is not None else []:
+            locs = [", ".join(x for x in (l.findtext(f"{TT}city"), l.findtext(f"{TT}country")) if x)
+                    for l in it.iter(f"{TT}location")]
+            status = (it.findtext("remoteStatus") or "").lower()
+            jobs.append(Job(
+                source=f"teamtailor:{slug}",
+                title=it.findtext("title") or "",
+                company=it.findtext("company_name") or company,
+                url=it.findtext("link") or "",
+                location="; ".join(l for l in locs if l),
+                remote=True if status in ("fully", "remote") else (False if status in ("none", "onsite") else None),
+                posted_at=parse_date(it.findtext("pubDate")),
+                description=html_to_text(it.findtext("description")),
+                notes=["hybrid"] if status == "hybrid" else [],
+            ))
+    return jobs
+
+
+def breezy(cfg: dict) -> list[Job]:
+    jobs: list[Job] = []
+    for slug in cfg["companies"].get("breezy", []):
+        data = _safe(lambda: get_json(f"https://{slug}.breezy.hr/json"), slug)
+        for j in data or []:
+            loc = j.get("location") or {}
+            jobs.append(Job(
+                source=f"breezy:{slug}",
+                title=j.get("name", ""),
+                company=(j.get("company") or {}).get("name") or slug.title(),
+                url=j.get("url", ""),
+                location=", ".join(x for x in (loc.get("city"), (loc.get("country") or {}).get("name")) if x),
+                remote=bool(loc.get("is_remote")),
+                posted_at=parse_date(j.get("published_date")),
+                employment_type=(j.get("type") or {}).get("name", ""),
+            ))
+    return jobs
+
+
 def _safe(fn, slug: str):
     """A single company renaming its board must not kill the whole run."""
     try:
         return fn()
     except HTTPError as e:
         print(f"    ! {slug}: HTTP {e.code} (slug wrong or board moved?)")
+        return None
+    except (OSError, ValueError, ET.ParseError) as e:  # timeouts, bad JSON/XML
+        print(f"    ! {slug}: {e}")
         return None

@@ -10,10 +10,13 @@ tell the user which `setup --section` to run instead of guessing their details.
 ```bash
 python3 -m jobpilot find
 ```
-Pulls sheet statuses; fetches every source (job boards, Greenhouse/Lever/Ashby/Workable/SmartRecruiters
-career pages, JSearch for each chosen region, LinkedIn/Indeed alert emails over IMAP, marked read);
-removes duplicates, spam, expired and incompatible jobs (role, region, language, deal-breakers),
-keeps each job's original source and link, extracts salary, pre-scores, and prints **`=== TO REVIEW`**.
+Pulls sheet statuses; fetches every source (company career pages on Greenhouse/Lever/Ashby/Workable/
+SmartRecruiters/Recruitee/Teamtailor/Breezy, remote boards incl. We Work Remotely, JSearch for each
+chosen region, and alert emails from LinkedIn, Indeed, Bayt, NaukriGulf, GulfTalent, foundit, Wellfound,
+Welcome to the Jungle, Arc, Turing, Glassdoor over IMAP, marked read once parsed); drops re-posting
+aggregators (only the employer's site, a no-account ATS, or a platform the user has an account on count);
+removes duplicates, spam, expired and incompatible jobs (role, region, language, deal-breakers), keeps
+each job's original source and link, extracts salary, pre-scores, and prints **`=== TO REVIEW`**.
 
 ## 2. Indeed (official connector, if available)
 `search_jobs` for the user's search title in their top-priority cities. For a new, recent, relevant
@@ -64,7 +67,8 @@ the terminal prints **BEFORE YOU SUBMIT** (every filled field, attachments, unan
 - **Submitted**: the site's confirmation page was detected, or the user confirms they saw it
 - **Pending**: started but not finished, or submitted without a confirmation yet
 - **Failed**: the application didn't go through (they type what went wrong)
-- **Manual action required**: LinkedIn / Indeed / NaukriGulf / Bayt, security check, or no form found
+- **Manual action required**: a platform the user signs in to (LinkedIn, Bayt, Wellfound...), a per-company
+  account portal (Workday...), a security check, or no form found
 
 Never click Submit, never automate those sites, never touch CAPTCHAs. Unanswered questions are saved
 in `questions.md`; you may draft `answers.json` for essay questions (see TAILOR.md), then `r` re-fills.

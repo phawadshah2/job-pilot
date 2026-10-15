@@ -42,7 +42,7 @@ def html_to_text(s: str | None) -> str:
 
 
 def parse_date(v) -> datetime | None:
-    """Accepts ISO strings, 'YYYY-MM-DD HH:MM:SS', or unix seconds / millis."""
+    """Accepts ISO strings, 'YYYY-MM-DD HH:MM:SS [UTC]', RSS dates, or unix seconds / millis."""
     if v in (None, ""):
         return None
     try:
@@ -51,11 +51,14 @@ def parse_date(v) -> datetime | None:
             if n > 10**12:
                 n //= 1000
             return datetime.fromtimestamp(n, tz=timezone.utc)
-        s = str(v).strip().replace("Z", "+00:00").replace(" ", "T", 1)
+        if re.match(r"^[A-Z][a-z]{2}, \d", str(v).strip()):  # RSS: 'Tue, 29 Sep 2026 19:13:52 +0000'
+            from email.utils import parsedate_to_datetime
+            return parsedate_to_datetime(str(v).strip())
+        s = re.sub(r"\s+UTC$", "+00:00", str(v).strip()).replace("Z", "+00:00").replace(" ", "T", 1)
         s = re.sub(r"\.(\d{6})\d+", r".\1", s)  # trim >6 fractional digits for py3.9
         d = datetime.fromisoformat(s)
         return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-    except (ValueError, OverflowError):
+    except (ValueError, OverflowError, TypeError):
         return None
 
 

@@ -14,6 +14,14 @@ def get_json(url: str, headers: dict[str, str] | None = None) -> Any:
     return _request(url, headers=headers)
 
 
+def get_text(url: str, headers: dict[str, str] | None = None) -> str:
+    """Raw body (RSS/XML feeds)."""
+    h = {"User-Agent": USER_AGENT}
+    h.update(headers or {})
+    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=TIMEOUT) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
 def post_json(url: str, body: Any, headers: dict[str, str] | None = None) -> Any:
     return _request(url, data=body, headers=headers)
 

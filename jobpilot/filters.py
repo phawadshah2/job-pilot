@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from .models import Job
+from .sites import is_aggregator
 
 
 def _rx(words: list[str]) -> re.Pattern:
@@ -92,6 +93,8 @@ class Filter:
         title = job.title
         if self.blocked(job.company, job.source, job.url):
             return "blocklisted"
+        if is_aggregator(job.apply_url or job.url):
+            return "aggregator link (employer hidden)"
 
         # --- role -------------------------------------------------------
         if self.exclude.search(title):

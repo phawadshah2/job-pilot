@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..sites import classify, open_only
 from .rules import Plan, build_plan
 
 HERE = Path(__file__).resolve().parent
@@ -14,14 +15,12 @@ DISCOVER_JS = (HERE / "discover.js").read_text()
 HIGHLIGHT_JS = (HERE / "highlight.js").read_text()
 
 # Sites where automating the form breaks the ToS: open the page, but don't fill.
-OPEN_ONLY = re.compile(r"linkedin\.com|indeed\.|glassdoor\.|bayt\.com|naukrigulf\.com", re.I)
 SUBMITTED = re.compile(r"thank(s| you) for (applying|your application)|application (has been )?(submitted|received)|"
                        r"we('ve| have) received your application", re.I)
 
 
 def site_name(url: str) -> str:
-    m = OPEN_ONLY.search(url or "")
-    return m.group(0).split(".")[0].capitalize() if m else "This site"
+    return classify(url)[1] or "This site"
 
 
 class RestrictedSite(Exception):
@@ -74,11 +73,11 @@ def _has_form(fields: list[dict]) -> bool:
 
 
 def open_form(page, url: str) -> list[dict]:
-    if OPEN_ONLY.search(url):
+    if open_only(url):
         raise RestrictedSite(url)
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(2500)
-    if OPEN_ONLY.search(page.url):  # an aggregator redirected us there
+    if open_only(page.url):  # an aggregator redirected us there
         raise RestrictedSite(page.url)
     fields = discover(page)
     if not _has_form(fields):
@@ -111,7 +110,7 @@ def wait_for_form(context, timeout_s: int = 600, poll_s: float = 2.0):
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         for pg in reversed(context.pages):
-            if OPEN_ONLY.search(pg.url):
+            if open_only(pg.url):
                 continue  # never read or fill LinkedIn/Indeed/... even if opened in this window
             try:
                 fields = discover(pg)
@@ -126,7 +125,7 @@ def wait_for_form(context, timeout_s: int = 600, poll_s: float = 2.0):
 
 
 def fill(page, fields: list[dict], applicant: dict, answers: dict[str, str]) -> FillResult:
-    if OPEN_ONLY.search(page.url):
+    if open_only(page.url):
         raise RestrictedSite(page.url)
     plan = build_plan(fields, applicant, answers)
     frame_of = {f["id"]: page.frames[f["frame"]] for f in fields}
@@ -184,7 +183,7 @@ def looks_submitted(page) -> bool:
 def submitted(page, form_url: str) -> bool:
     """Confirmation text on screen AND the form is gone (or the URL moved on), so text
     like 'application received' sitting next to an unfilled form doesn't count."""
-    if OPEN_ONLY.search(page.url or "") or not looks_submitted(page):
+    if open_only(page.url or "") or not looks_submitted(page):
         return False
     return page.url != form_url or not _has_form(discover(page))
 

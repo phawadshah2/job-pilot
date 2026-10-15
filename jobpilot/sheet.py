@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 
 from .http import post_json
+from .sites import apply_via
 
 
 def _post(webhook_url: str, body: dict):
@@ -24,7 +25,7 @@ def _post(webhook_url: str, body: dict):
         ) from e
 
 COLUMNS = [
-    "Date found", "Company", "Role", "Location", "Work mode", "Salary", "Source", "URL", "Posted",
+    "Date found", "Company", "Role", "Location", "Work mode", "Salary", "Source", "URL", "Apply via", "Posted",
     "Match score", "Match explanation", "Missing requirements", "CV", "Cover letter",
     "Status", "Submitted date", "Follow-up date", "Notes", "Key",
 ]
@@ -47,7 +48,7 @@ def to_row(r) -> list:
     why = _get(r, "match_explanation") or ("rule-based score; AI review pending" if r["score"] is not None else "")
     return [
         found, r["company"], r["title"], r["location"], r["work_mode"], r["salary"] or "", r["source"],
-        r["url"], (r["posted_at"] or "")[:10], "" if score is None else score, why,
+        r["url"], apply_via(r["url"], _get(r, "apply_url") or ""), (r["posted_at"] or "")[:10], "" if score is None else score, why,
         _get(r, "missing") or r["gaps"] or "", _get(r, "cv_pdf") or "", _get(r, "cover_pdf") or "",
         r["status"], r["applied_at"] or "", r["follow_up_at"] or "", r["notes"] or "", r["key"],
     ]

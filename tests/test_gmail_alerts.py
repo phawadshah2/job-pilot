@@ -43,9 +43,28 @@ class MessageRoutingTest(unittest.TestCase):
         _, jobs = parse_message(self.mail("Indeed <donotreply@jobalert.indeed.com>", (FIX / "indeed_alert.txt").read_text()))
         self.assertEqual(len(jobs), 3)
 
-    def test_unknown_sender_is_left_for_later(self):
-        _, jobs = parse_message(self.mail("Bayt <alerts@bayt.com>", "whatever"))
-        self.assertIsNone(jobs)
+    def test_mail_without_job_links_gives_nothing(self):
+        # welcome mails and verification codes stay unread
+        _, jobs = parse_message(self.mail("Bayt <alerts@bayt.com>", "whatever", "<a href='https://www.bayt.com/en/help/'>Help</a>"))
+        self.assertEqual(jobs, [])
+
+    def test_link_parser_any_platform(self):
+        html = ("<a href='https://www.gulftalent.com/candidates/home'>Alex</a>"
+                "<a href='https://www.gulftalent.com/uae/jobs/flutter-developer-643017?utm=x'><b>Flutter Developer</b>"
+                "<span>Acme</span><span>Dubai, UAE</span><span>3 days ago</span><span>Easy Apply</span></a>"
+                "<a href='https://www.gulftalent.com/uae/jobs/flutter-developer-643017'>Flutter Developer</a>"
+                "<a href='https://u1.ct.sendgrid.net/ls/click?upn=abc'><div>Senior Flutter Engineer</div><div>Beta</div>"
+                "<div>Remote</div></a>"
+                "<a href='https://www.gulftalent.com/unsubscribe'>here</a>")
+        resolver = lambda u: "https://app.welcometothejungle.com/jobs/xyz?ref=mail"
+        _, jobs = parse_message(self.mail("GulfTalent <jobs@gulftalent.com>", "", html), resolver=resolver)
+        self.assertEqual([(j.title, j.company, j.location) for j in jobs],
+                         [("Flutter Developer", "Acme", "Dubai, UAE"), ("Senior Flutter Engineer", "Beta", "Remote")])
+        self.assertEqual(jobs[0].url, "https://www.gulftalent.com/uae/jobs/flutter-developer-643017")
+        self.assertEqual(jobs[0].source, "email:gulftalent")
+        self.assertTrue(jobs[0].posted_at)
+        self.assertEqual(jobs[1].url, "https://app.welcometothejungle.com/jobs/xyz")
+        self.assertTrue(jobs[1].remote)
 
     def test_html_only_linkedin_keeps_links(self):
         html = ("<table><tr><td>Flutter Developer</td></tr><tr><td>Acme</td></tr><tr><td>Dubai</td></tr>"

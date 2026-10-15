@@ -52,10 +52,22 @@ class JSearchTest(unittest.TestCase):
     def test_prefers_employer_ats_over_linkedin(self):
         self.assertEqual(best_apply_link(JOB), "https://job-boards.greenhouse.io/acme/jobs/9")
 
-    def test_falls_back_away_from_restricted_boards(self):
+    def test_account_platform_beats_aggregator(self):
         j = dict(JOB, apply_options=JOB["apply_options"][:2])
-        self.assertEqual(best_apply_link(j), "https://bebee.com/x")
+        self.assertEqual(best_apply_link(j), "https://www.linkedin.com/jobs/view/1")
         self.assertEqual(best_apply_link(dict(JOB, apply_options=[])), "https://www.linkedin.com/jobs/view/1")
+
+    def test_company_site_beats_account_platform(self):
+        j = dict(JOB, apply_options=[JOB["apply_options"][0],
+                                     {"apply_link": "https://careers.acme.ae/jobs/9", "is_direct": True}])
+        self.assertEqual(best_apply_link(j), "https://careers.acme.ae/jobs/9")
+
+    def test_aggregator_only_jobs_are_dropped(self):
+        j = dict(JOB, job_apply_link="https://ae.jooble.org/jdp/1",
+                 apply_options=[{"apply_link": "https://www.jobleads.com/ae/job/x"}, {"apply_link": "https://bebee.com/x"}])
+        self.assertEqual(best_apply_link(j), "")
+        self.assertEqual(parse({"data": {"jobs": [j, JOB]}})[0].company, "Acme")
+        self.assertEqual(len(parse({"data": {"jobs": [j]}})), 0)
 
     def test_provider_choice(self):
         self.assertIn("openwebninja", endpoint({"OPENWEBNINJA_API_KEY": "k", "RAPIDAPI_KEY": "r"})[0])

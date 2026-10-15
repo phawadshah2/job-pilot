@@ -116,12 +116,15 @@ def cmd_fetch(args) -> int:
 
 
 def cmd_clean(args) -> int:
-    """Re-apply the blocklist to stored jobs that haven't been acted on yet."""
+    """Re-apply the blocklist and the aggregator rule to stored jobs not acted on yet."""
+    from .sites import is_aggregator
     store, flt = open_store(), Filter(load_cfg())
     n = 0
-    for r in store.query("status IN ('New', 'Tailoring')"):
-        if flt.blocked(r["company"], r["source"], r["url"]):
-            notes = "; ".join(x for x in [r["notes"], "blocklisted"] if x)
+    for r in store.query("status IN ('New', 'Tailoring', 'Ready', 'Approved')"):
+        why = ("blocklisted" if flt.blocked(r["company"], r["source"], r["url"])
+               else "aggregator link" if is_aggregator(r["apply_url"] or r["url"]) else "")
+        if why:
+            notes = "; ".join(x for x in [r["notes"], why] if x)
             store.update(r["key"], status="Skipped", notes=notes)
             n += 1
             print(f"  skipped  {r['key'][:8]}  {r['title'][:50]} @ {r['company']}")
@@ -345,16 +348,18 @@ def cmd_review(args) -> int:
     app = json.loads(paths.applicant_file().read_text()) if paths.applicant_file().exists() else {}
     answers = {k: v for k, v in app.pop("answers", {}).items() if not k.startswith("_")}
     known = {k: v for k, v in app.items() if v not in (None, "") and not k.startswith("_")}
-    from .apply.runner import OPEN_ONLY, application_url, ats_of
+    from .apply.runner import application_url, open_only
+    from .sites import apply_via
     for r in rows:
         job_dir, meta, cv, cover = _job_files(r)
         url = application_url(r["url"], r["apply_url"] or "")
         score = r["ai_score"] if r["ai_score"] is not None else r["score"]
         per_job = json.loads((job_dir / "answers.json").read_text()) if (job_dir / "answers.json").exists() else {}
-        manual = bool(OPEN_ONLY.search(url))
+        manual = open_only(url)
         print(f"\n##### {r['key'][:8]} · {r['company']} — {r['title']}   [{r['status']}]")
         print(f"  Where:   {r['location']} ({r['work_mode']})   Salary: {r['salary'] or 'not stated'}")
-        print(f"  Apply:   {url}   ({'manual: you apply in your normal browser' if manual else ats_of(url) + ' form, pre-filled'})")
+        print(f"  Apply:   {url}\n           via {apply_via(url)}: "
+              + ("you apply in your normal browser" if manual else "pre-filled for you, you click Submit"))
         print(f"  Score:   {score}  {r['match_explanation'] or ''}")
         print(f"  Missing: {r['missing'] or r['gaps'] or 'nothing detected'}")
         print(f"  CV:      {cv or '✗ not built yet'}")
@@ -416,7 +421,8 @@ def cmd_apply(args) -> int:
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             str(paths.data_dir() / "chrome-profile"), channel="chrome", headless=args.plan,
-            viewport=None if not args.plan else {"width": 1280, "height": 900}, args=["--start-maximized"])
+            viewport=None if not args.plan else {"width": 1280, "height": 900}, args=["--start-maximized"],
+            chromium_sandbox=True)  # Playwright adds --no-sandbox otherwise
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         for r in rows:
             if apply_one(store, r, page, runner, applicant, global_answers, args.plan) == "quit":
@@ -445,8 +451,8 @@ def apply_one(store, r, page, runner, applicant, global_answers, plan_only) -> s
               + (f"\n    Cover letter: {cover}" if cover else ""))
         return _record(store, r, _ask(page, runner, watch=False), manual=True, why=reason)
 
-    if runner.OPEN_ONLY.search(url):
-        return manual(f"{runner.site_name(url)} doesn't allow automated applications")
+    if runner.open_only(url):
+        return manual(f"{runner.site_name(url)}: apply with your account")
 
     applicant = dict(applicant, _resume_path=str(cv), _cover_path=str(cover) if cover else "",
                      _cover_text=_cover_text(job_dir))
@@ -466,7 +472,10 @@ def apply_one(store, r, page, runner, applicant, global_answers, plan_only) -> s
         return "next"
     if not runner._has_form(fields):
         if runner.is_bot_check(page):
-            print("    The site is showing a security check: complete it yourself in the Chrome window.")
+            # Bot checks (e.g. Cloudflare) reject automated browsers even when a person ticks the box.
+            # Never work around them: hand the job to your normal browser instead.
+            page.goto("about:blank")
+            return manual(f"{runner.site_name(url)} shows a security check")
         print("    No application form here yet. In Chrome, click the site's Apply button "
               "(new tabs are fine); I'll take over as soon as a form appears…")
         page, fields = runner.wait_for_form(page.context, timeout_s=600)
@@ -938,12 +947,15 @@ def sync(cfg: dict, store: Store) -> int:
     if not url or not token:
         print(f"\n(Sheet not configured: {len(rows)} row(s) queued in data/jobs.db; see README step 2.)")
         return 0
-    # Only qualified jobs go to the sheet: anything past "New", or New with a good enough score.
-    # Jobs skipped/unqualified before they ever reached the sheet stay local-only.
+    # Only qualified jobs go to the sheet: anything past "New" (except Skipped), or New with a good
+    # enough score. Jobs skipped/unqualified before they ever reached the sheet stay local-only;
+    # rows already in the sheet keep getting their updates (e.g. -> Skipped).
     min_score = cfg.get("find", {}).get("sheet_min_score", 60)
     def qualified(r):
         score = r["ai_score"] if r["ai_score"] is not None else r["score"]
-        return r["status"] not in ("New", "Skipped") or (score is not None and score >= min_score)
+        if r["status"] == "Skipped":
+            return False
+        return r["status"] != "New" or (score is not None and score >= min_score)
     local_only = [r for r in rows if not r["in_sheet"] and not qualified(r)]
     local_keys = {r["key"] for r in local_only}
     rows = [r for r in rows if r["key"] not in local_keys]

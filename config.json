@@ -6,11 +6,15 @@
     "remotive": true,
     "remoteok": true,
     "jobicy": true,
+  "weworkremotely": true,
     "greenhouse": true,
     "lever": true,
     "ashby": true,
     "workable": true,
     "smartrecruiters": true,
+  "recruitee": true,
+  "teamtailor": true,
+  "breezy": true,
     "jsearch": true,
     "gmail": true
   },
@@ -26,7 +30,7 @@
   },
   "gmail": {
     "_why": "Job-alert emails read over IMAP with GMAIL_ADDRESS + GMAIL_APP_PASSWORD from .env; processed alerts are marked read.",
-    "query": "newer_than:7d is:unread (from:jobalert.indeed.com OR from:jobalerts-noreply@linkedin.com OR from:bayt.com OR from:gulftalent.com OR from:naukrigulf.com)"
+    "query": "newer_than:7d is:unread from:(jobalert.indeed.com OR jobalerts-noreply@linkedin.com OR bayt.com OR naukrigulf.com OR gulftalent.com OR founditgulf.com OR foundit.in OR wellfound.com OR welcometothejungle.com OR otta.com OR arc.dev OR turing.com OR glassdoor.com OR dice.com OR reed.co.uk OR seek.com.au)"
   },
   "blocklist": {
     "_why": "Reposting/spam feeds seen in JSearch results (2026-10-11). Substring match, case-insensitive. `jobpilot clean` re-applies it to stored New jobs.",

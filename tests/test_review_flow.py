@@ -121,6 +121,30 @@ class OutcomeTest(unittest.TestCase):
         self.assertEqual(self.outcome("q", manual=True)["status"], "Manual action required")
 
 
+class BotCheckTest(unittest.TestCase):
+    def test_security_check_goes_to_your_browser_as_manual(self):
+        from jobpilot.apply import runner as real
+        store = cli.open_store()
+        key = stored(store, "CheckCo", status="Approved")
+        tmp = Path(tempfile.mkdtemp())
+        (tmp / "job.json").write_text(json.dumps({"label": "CheckCo - Senior Flutter Developer"}))
+        (tmp / "cv.pdf").write_bytes(b"%PDF")
+        store.update(key, cv_dir=str(tmp), cv_pdf=str(tmp / "cv.pdf"))
+        store.commit()
+        runner = mock.Mock(open_only=real.open_only, site_name=real.site_name, RestrictedSite=real.RestrictedSite,
+                           application_url=lambda u, a: "https://ae.jooble.org/jdp/1", ats_of=lambda u: "other",
+                           open_form=lambda page, url: [], _has_form=lambda f: False, is_bot_check=lambda page: True,
+                           load_answers=lambda d, g: {})
+        page = mock.Mock(url="about:blank")
+        with mock.patch.object(cli, "sync", return_value=0), mock.patch.object(cli, "_open_in_default_browser") as op, \
+                mock.patch.object(cli, "_copy_to_clipboard"), mock.patch.object(cli, "_ask", return_value="l"), \
+                mock.patch("builtins.print"):
+            cli.apply_one(store, store.get(key), page, runner, {}, {}, plan_only=False)
+        op.assert_called_once_with("https://ae.jooble.org/jdp/1")
+        runner.wait_for_form.assert_not_called()          # no waiting on a check the automated browser can't pass
+        self.assertEqual(cli.open_store().get(key)["status"], "Manual action required")
+
+
 if __name__ == "__main__":
     unittest.main()
 
