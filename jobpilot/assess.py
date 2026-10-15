@@ -11,7 +11,7 @@ import re
 import urllib.request
 from pathlib import Path
 
-from .apply.runner import OPEN_ONLY
+from .sites import open_only
 from .filters import CURRENCY
 
 # Sources whose job lists come straight from the employer's live ATS feed: always current.
@@ -24,8 +24,8 @@ EXPIRED = re.compile(
 
 def link_status(source: str, url: str, timeout: int = 15) -> bool | None:
     """True = live, False = expired/removed, None = unknown (not checked or blocked).
-    Never fetches LinkedIn/Indeed/Glassdoor/Bayt/NaukriGulf pages."""
-    if not url or OPEN_ONLY.search(url):
+    Never fetches job platforms you sign in to (LinkedIn, Bayt, ...) or account portals."""
+    if not url or open_only(url):
         return None
     if LIVE_FEEDS.match(source or ""):
         return True

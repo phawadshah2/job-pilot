@@ -1,10 +1,12 @@
 """Remote-first job boards with free, public, ToS-friendly APIs."""
 from __future__ import annotations
 
+import re
 import time
 import urllib.parse
+import xml.etree.ElementTree as ET
 
-from ..http import get_json
+from ..http import get_json, get_text
 from ..models import Job
 from ..text import html_to_text, parse_date
 
@@ -99,3 +101,31 @@ def himalayas(cfg: dict) -> list[Job]:
                 break
             time.sleep(0.4)
     return jobs
+
+
+WWR_FEEDS = ("https://weworkremotely.com/remote-jobs.rss",
+             "https://weworkremotely.com/categories/remote-programming-jobs.rss")
+
+
+def weworkremotely(cfg: dict) -> list[Job]:
+    """We Work Remotely's public RSS feeds. Titles read 'Company: Role'."""
+    seen: dict[str, Job] = {}
+    for feed in WWR_FEEDS:
+        channel = ET.fromstring(get_text(feed)).find("channel")
+        for it in channel.findall("item") if channel is not None else []:
+            link = it.findtext("link") or ""
+            company, _, title = (it.findtext("title") or "").partition(": ")
+            if not title:
+                company, title = "", company
+            region = it.findtext("region") or ""
+            seen[link] = Job(
+                source="weworkremotely",
+                title=title.strip(),
+                company=company.strip(),
+                url=link,
+                location="Worldwide" if re.search(r"anywhere", region, re.I) else region,
+                remote=True,
+                posted_at=parse_date(it.findtext("pubDate")),
+                description=html_to_text(it.findtext("description")),
+            )
+    return list(seen.values())

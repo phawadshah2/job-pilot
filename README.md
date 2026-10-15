@@ -1,15 +1,16 @@
 # job-pilot
 
-Find jobs for **your** role across job boards, company career pages, Google Jobs (LinkedIn/Indeed
-listings) and your **job-alert emails**, score them against your skills, tailor an ATS-friendly CV
-for each good match, and pre-fill the application forms. **You always click Submit.**
+Find jobs for **your** role across company career pages, well-known remote boards, Google Jobs and
+your **job-alert emails** (LinkedIn, Indeed, Bayt, NaukriGulf, GulfTalent, Wellfound, ...), score
+them against your skills, tailor an ATS-friendly CV for each good match, and pre-fill the application
+forms. Re-posting aggregators are dropped. **You always click Submit.**
 
 Works for any tech role (Flutter, iOS, backend, data, …) and any mix of regions, ranked in the order
 you choose. Free to run: every source has a free tier. Designed to be driven by
 [Claude Code](https://claude.com/claude-code): say **"find jobs"**, then **"apply"**.
 
 ```
-find:  job boards + career pages + JSearch + Gmail alerts → filter → score (your region priority first)
+find:  career pages + remote boards + JSearch + alert emails → drop aggregators → filter → score (region priority first)
        → prepare top matches → Claude writes tailor.json → CV + JD PDFs (one clean design) → Google Sheet
 apply: each Ready job opens pre-filled with its CV → you review and click Submit → sheet says "Applied"
 ```
@@ -44,26 +45,43 @@ fictional profile.
 | **Gmail app password** (optional) | Reads LinkedIn/Indeed job-alert emails for free, marks them read | Google Account → Security → 2-Step Verification → App passwords |
 
 ## Use
-With Claude Code in this folder, say **"find jobs"**, then later **"apply"** (playbook: [FIND.md](FIND.md)).
+With Claude Code in this folder, say **"find jobs"**: you get every reviewed job in one list, tick the
+ones to keep, and only those go to the sheet. Then say **"apply"**: one job at a time, a tailored CV
+(and cover letter) plus the link and ready answers; you apply and say "done" (playbook: [FIND.md](FIND.md)).
 By hand:
 ```bash
 python3 -m jobpilot find                    # collect + clean + pre-score; prints jobs to review
 python3 -m jobpilot jd <key>...             # read a candidate's JD
-python3 -m jobpilot assess --file a.json    # record AI score/explanation/missing; strong ones get prepared
-python3 -m jobpilot build <key>...          # tailor.json -> CV (+ cover letter) PDFs, status Ready
-python3 -m jobpilot review                  # everything you're about to approve
-python3 -m jobpilot approve <key>...        # approve for applying
-.venv/bin/python -m jobpilot apply          # pre-fill approved jobs; you click Submit; status recorded
+python3 -m jobpilot assess --file a.json    # record AI score/explanation/missing (no status change)
+python3 -m jobpilot pick <keep keys>...     # your choice: kept -> Approved + sheet, the rest skipped
+python3 -m jobpilot next                    # the next job to apply to
+python3 -m jobpilot prepare <key>           # job folder for tailoring
+python3 -m jobpilot build <key>             # tailor.json -> CV (+ cover letter) PDFs
+python3 -m jobpilot status <key> Submitted  # after you applied (or Pending / Failed / Skipped)
 python3 -m jobpilot followups               # applications due for a follow-up
 python3 -m jobpilot sheet-reset             # empty the Google Sheet (asks first)
 ```
-Statuses: New → Tailoring → Ready → Approved → Pending / Failed / Manual action required → **Submitted**
-(only after the site's confirmation page or your explicit confirmation) → Interview → Offer / Rejected / Skipped.
+Statuses: New → Approved (you kept it) → Pending / Failed / Manual action required → **Submitted**
+(only after you confirm) → Interview → Offer / Rejected / Skipped.
+
+## Where jobs come from, and where you apply
+Every job's link is sorted (`jobpilot/sites.py`) and shown in the sheet's **Apply via** column:
+
+| Apply via | Examples | What happens |
+|---|---|---|
+| Company form (no account) | Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee, Teamtailor, Breezy, the company's own site | Pre-filled for you |
+| Remote board → company | Himalayas, Remotive, RemoteOK, Jobicy, We Work Remotely | Board page, then the company's form |
+| Your account | LinkedIn, Indeed, Bayt, NaukriGulf, GulfTalent, foundit Gulf, Wellfound, Welcome to the Jungle, Arc, Turing, Glassdoor | Opened in your own browser |
+| Needs account | Workday, SuccessFactors, Taleo, Oracle Cloud, iCIMS (one account per company) | Opened in your own browser |
+| Aggregator | Jooble, JobLeads, Trabajo, beBee, Jobrapido, Upwork, ... | Dropped |
+
+Platforms without a public feed (Bayt, Wellfound, ...) come in through their **job-alert emails**:
+turn alerts on, sent to the Gmail that job-pilot reads.
 
 ## What's automated, and what never is
-- **Never automated:** clicking Submit; LinkedIn / Indeed / Glassdoor / Bayt / NaukriGulf forms (opened in
-  your normal browser instead, since automating them risks your account); CAPTCHAs and security checks;
-  consent boxes and demographic questions.
+- **Never automated:** clicking Submit; job platforms you sign in to and per-company account portals
+  (opened in your normal browser instead, since automating them risks your account); CAPTCHAs and
+  security checks (a site showing one is handed to your browser); consent boxes and demographic questions.
 - **CV honesty:** `finalize` refuses a CV that mentions a skill you said you don't have, and tailoring can
   only change text (the design and your facts come from your own files).
 

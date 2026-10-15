@@ -116,12 +116,15 @@ def cmd_fetch(args) -> int:
 
 
 def cmd_clean(args) -> int:
-    """Re-apply the blocklist to stored jobs that haven't been acted on yet."""
+    """Re-apply the blocklist and the aggregator rule to stored jobs not acted on yet."""
+    from .sites import is_aggregator
     store, flt = open_store(), Filter(load_cfg())
     n = 0
-    for r in store.query("status IN ('New', 'Tailoring')"):
-        if flt.blocked(r["company"], r["source"], r["url"]):
-            notes = "; ".join(x for x in [r["notes"], "blocklisted"] if x)
+    for r in store.query("status IN ('New', 'Tailoring', 'Ready', 'Approved')"):
+        why = ("blocklisted" if flt.blocked(r["company"], r["source"], r["url"])
+               else "aggregator link" if is_aggregator(r["apply_url"] or r["url"]) else "")
+        if why:
+            notes = "; ".join(x for x in [r["notes"], why] if x)
             store.update(r["key"], status="Skipped", notes=notes)
             n += 1
             print(f"  skipped  {r['key'][:8]}  {r['title'][:50]} @ {r['company']}")
@@ -229,7 +232,7 @@ def cmd_prepare(args) -> int:
         notes = r["notes"] or ""
         if prior and "applied before" not in notes:
             notes = "; ".join(x for x in [notes, "applied before: " + ", ".join(prior)] if x)
-        store.update(r["key"], status="Tailoring", cv_dir=str(d), notes=notes)
+        store.update(r["key"], status=_forward(r["status"], "Tailoring"), cv_dir=str(d), notes=notes)
         print(f"  {r['score']:>3}  {r['key'][:8]}  {d}")
         if prior:
             print(f"       ⚠ same company before: {', '.join(prior)}")
@@ -272,7 +275,7 @@ def cmd_finalize(args) -> int:
             rc = 1
             continue
         ready = rep.pages <= 2
-        store.update(r["key"], status="Ready" if ready else "Tailoring", cv_dir=str(rep.cv_pdf.parent),
+        store.update(r["key"], status=_forward(r["status"], "Ready" if ready else "Tailoring"), cv_dir=str(rep.cv_pdf.parent),
                      cv_pdf=str(rep.cv_pdf), cover_pdf=str(rep.cover_pdf) if rep.cover_pdf else None)
         print(f"{'✓' if ready else '…'} {r['company']} - {r['title']}{'' if ready else '  (still Tailoring: over 2 pages)'}")
         rc = rc if ready else 1
@@ -297,6 +300,11 @@ def cmd_status(args) -> int:
     store.commit()
     print(f"{r['company']} - {r['title']}: {r['status']} → {args.status}")
     return sync(load_cfg(), store)
+
+
+def _forward(current: str, new: str) -> str:
+    """Never move a job backwards: an Approved job being tailored at apply time stays Approved."""
+    return new if status_mod.can_move(current, new) else current
 
 
 def set_status(store: Store, r, status: str, note: str = "") -> None:
@@ -345,16 +353,18 @@ def cmd_review(args) -> int:
     app = json.loads(paths.applicant_file().read_text()) if paths.applicant_file().exists() else {}
     answers = {k: v for k, v in app.pop("answers", {}).items() if not k.startswith("_")}
     known = {k: v for k, v in app.items() if v not in (None, "") and not k.startswith("_")}
-    from .apply.runner import OPEN_ONLY, application_url, ats_of
+    from .apply.runner import application_url, open_only
+    from .sites import apply_via
     for r in rows:
         job_dir, meta, cv, cover = _job_files(r)
         url = application_url(r["url"], r["apply_url"] or "")
         score = r["ai_score"] if r["ai_score"] is not None else r["score"]
         per_job = json.loads((job_dir / "answers.json").read_text()) if (job_dir / "answers.json").exists() else {}
-        manual = bool(OPEN_ONLY.search(url))
+        manual = open_only(url)
         print(f"\n##### {r['key'][:8]} · {r['company']} — {r['title']}   [{r['status']}]")
         print(f"  Where:   {r['location']} ({r['work_mode']})   Salary: {r['salary'] or 'not stated'}")
-        print(f"  Apply:   {url}   ({'manual: you apply in your normal browser' if manual else ats_of(url) + ' form, pre-filled'})")
+        print(f"  Apply:   {url}\n           via {apply_via(url)}: "
+              + ("you apply in your normal browser" if manual else "pre-filled for you, you click Submit"))
         print(f"  Score:   {score}  {r['match_explanation'] or ''}")
         print(f"  Missing: {r['missing'] or r['gaps'] or 'nothing detected'}")
         print(f"  CV:      {cv or '✗ not built yet'}")
@@ -416,7 +426,8 @@ def cmd_apply(args) -> int:
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             str(paths.data_dir() / "chrome-profile"), channel="chrome", headless=args.plan,
-            viewport=None if not args.plan else {"width": 1280, "height": 900}, args=["--start-maximized"])
+            viewport=None if not args.plan else {"width": 1280, "height": 900}, args=["--start-maximized"],
+            chromium_sandbox=True)  # Playwright adds --no-sandbox otherwise
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         for r in rows:
             if apply_one(store, r, page, runner, applicant, global_answers, args.plan) == "quit":
@@ -445,8 +456,8 @@ def apply_one(store, r, page, runner, applicant, global_answers, plan_only) -> s
               + (f"\n    Cover letter: {cover}" if cover else ""))
         return _record(store, r, _ask(page, runner, watch=False), manual=True, why=reason)
 
-    if runner.OPEN_ONLY.search(url):
-        return manual(f"{runner.site_name(url)} doesn't allow automated applications")
+    if runner.open_only(url):
+        return manual(f"{runner.site_name(url)}: apply with your account")
 
     applicant = dict(applicant, _resume_path=str(cv), _cover_path=str(cover) if cover else "",
                      _cover_text=_cover_text(job_dir))
@@ -466,7 +477,10 @@ def apply_one(store, r, page, runner, applicant, global_answers, plan_only) -> s
         return "next"
     if not runner._has_form(fields):
         if runner.is_bot_check(page):
-            print("    The site is showing a security check: complete it yourself in the Chrome window.")
+            # Bot checks (e.g. Cloudflare) reject automated browsers even when a person ticks the box.
+            # Never work around them: hand the job to your normal browser instead.
+            page.goto("about:blank")
+            return manual(f"{runner.site_name(url)} shows a security check")
         print("    No application form here yet. In Chrome, click the site's Apply button "
               "(new tabs are fine); I'll take over as soon as a form appears…")
         page, fields = runner.wait_for_form(page.context, timeout_s=600)
@@ -764,7 +778,6 @@ def cmd_find(args) -> int:
             expired += 1
     store.commit()
     print(f"\n## Link check: {expired} expired posting(s) skipped")
-    sync(cfg, store)
     path = write_digest(store)
     print(compact_summary(store, cfg))
     print(f"(full digest: {path})")
@@ -772,19 +785,24 @@ def cmd_find(args) -> int:
 
 
 def review_candidates(store: Store, cfg: dict) -> list:
-    """New jobs worth an AI review: rule score >= find.prepare_min_score, not reviewed yet, priority order."""
+    """New jobs worth an AI review: rule score >= find.list_min_score, not reviewed yet, priority order."""
     f = cfg.get("find", {})
-    rows = store.query("status='New' AND ai_score IS NULL AND score >= ?", (f.get("prepare_min_score", 70),))
-    return by_priority(rows, cfg["region_order"])[: f.get("prepare_top", 12)]
+    rows = store.query("status='New' AND ai_score IS NULL AND score >= ?", (f.get("list_min_score", 50),))
+    return by_priority(rows, cfg["region_order"])[: f.get("list_max", 30)]
+
+
+def reviewed(store: Store, cfg: dict) -> list:
+    """Reviewed jobs waiting for the user's pick, priority order."""
+    return by_priority(store.query("status='New' AND ai_score IS NOT NULL"), cfg["region_order"])
 
 
 def compact_summary(store: Store, cfg: dict | None = None) -> str:
     """What Claude needs next, in the user's region priority: jobs to review, then jobs to tailor."""
     cfg = cfg or load_cfg()
     cands = review_candidates(store, cfg)
-    tailor = by_priority(store.query("status='Tailoring'"), cfg["region_order"])
-    ready = store.query("status IN ('Ready','Approved')")
-    lines = [f"\n=== TO REVIEW: {len(cands)} | TO TAILOR: {len(tailor)} | Ready: {len(ready)} | "
+    picks = reviewed(store, cfg)
+    to_apply = store.query("status IN ('Approved','Tailoring','Ready','Pending')")
+    lines = [f"\n=== TO REVIEW: {len(cands)} | WAITING FOR YOUR PICK: {len(picks)} | TO APPLY: {len(to_apply)} | "
              f"follow-ups due: {len(due_followups(store))} | JSearch this month: {store.month_count('jsearch')} ==="]
 
     def line(r):
@@ -797,9 +815,9 @@ def compact_summary(store: Store, cfg: dict | None = None) -> str:
     if cands:
         lines.append("-- review: `jobpilot jd <keys>`, then `jobpilot assess --file <json>`")
         lines += [line(r) for r in cands]
-    if tailor:
-        lines.append("-- tailor: write tailor.json, then `jobpilot build <keys>`")
-        lines += [line(r) for r in tailor]
+    if picks:
+        lines.append("-- show these to the user to pick, then `jobpilot pick <kept keys>`")
+        lines += [line(r) + f" | {r['match_explanation'] or ''}"[:60] for r in picks]
     return "\n".join(lines)
 
 
@@ -816,33 +834,54 @@ def cmd_jd(args) -> int:
 
 
 def cmd_assess(args) -> int:
-    """Record AI assessments; strong matches are prepared for tailoring, weak ones skipped."""
+    """Record AI assessments (score, why, missing). Nothing changes status: the user picks next."""
     from .assess import load_assessments
-    cfg, store, profile = load_cfg(), open_store(), load_profile()
-    f = cfg.get("find", {})
-    strong, floor = f.get("strong_match_score", 75), f.get("sheet_min_score", 60)
+    cfg, store = load_cfg(), open_store()
+    keep_min = cfg.get("find", {}).get("keep_min_score", 60)
     items = load_assessments(Path(args.file)) if args.file else [
         {"key": args.key, "score": args.score, "why": args.why or "", "missing": args.missing or ""}]
     for it in items:
         r = resolve(store, it["key"])
         store.update(r["key"], ai_score=int(it["score"]), match_explanation=it.get("why", ""), missing=it.get("missing", ""))
-        r = store.get(r["key"])
-        if it["score"] >= strong and r["status"] == "New":
-            try:
-                d = prepare(r, profile)
-                store.update(r["key"], status="Tailoring", cv_dir=str(d))
-                outcome = f"strong → prepared {d.name}"
-            except TailorError as e:
-                outcome = f"strong, but can't prepare: {e}"
-        elif it["score"] < floor and r["status"] == "New":
-            set_status(store, r, "Skipped", note=f"AI: weak match ({it['score']})")
-            outcome = "weak → skipped"
-        else:
-            outcome = "kept for the sheet, not tailored"
-        print(f"  {r['key'][:8]} {int(it['score']):>3}  {r['company'][:28]} - {r['title'][:40]}: {outcome}")
+        tip = "suggest KEEP" if it["score"] >= keep_min else "suggest skip"
+        print(f"  {r['key'][:8]} {int(it['score']):>3}  {r['company'][:28]} - {r['title'][:40]}: {tip}")
     store.commit()
-    sync(cfg, store)
     print(compact_summary(store, cfg))
+    return 0
+
+
+def cmd_pick(args) -> int:
+    """The user's choice: kept jobs -> Approved (and into the sheet); every other reviewed job -> Skipped (local only)."""
+    cfg, store = load_cfg(), open_store()
+    kept = {resolve(store, k)["key"] for k in args.keys}
+    today = date.today().isoformat()
+    n_skip = 0
+    for k in kept:
+        r = store.get(k)
+        if r["status"] in ("New", "Skipped"):
+            store.update(k, status="Approved", approved_at=today)
+        print(f"  ✓ keep   {k[:8]} {r['company'][:28]} - {r['title'][:50]}")
+    for r in reviewed(store, cfg):
+        if r["key"] not in kept:
+            set_status(store, r, "Skipped", note="you skipped it")
+            n_skip += 1
+    store.commit()
+    print(f"{len(kept)} kept, {n_skip} skipped.")
+    sync(cfg, store)
+    return 0
+
+
+def cmd_next(args) -> int:
+    """The next job to apply to (priority order), with everything needed to apply."""
+    cfg, store = load_cfg(), open_store()
+    rows = by_priority(store.query("status IN ('Approved','Tailoring','Ready','Pending')"), cfg["region_order"])
+    if args.ref:
+        rows = [resolve(store, args.ref)]
+    if not rows:
+        print("Nothing left to apply to. Say \"find jobs\" for more.")
+        return 0
+    cmd_review(argparse.Namespace(keys=[rows[0]["key"]]))
+    print(f"\n({len(rows) - 1} more after this one)")
     return 0
 
 
@@ -862,24 +901,6 @@ def cmd_build(args) -> int:
     if not ok:
         return 1
     return cmd_finalize(argparse.Namespace(refs=ok, verbose=args.verbose))
-
-
-def cmd_daily(args) -> int:
-    """The unattended morning run (minus tailoring, which Claude does per TAILOR.md)."""
-    cfg = load_cfg()
-    store = open_store()
-    d = cfg.get("daily", {})
-    print("## 1. Pull status changes from the sheet")
-    pull(cfg, store)
-    print("\n## 2. Fetch + score")
-    cmd_fetch(argparse.Namespace(dry_run=False, why=False, only=None))
-    print("\n## 3. Clean (blocklist)")
-    cmd_clean(None)
-    print("\n## 4. Prepare the best matches for tailoring")
-    cmd_prepare(argparse.Namespace(keys=[], top=d.get("prepare_top", 10), min=d.get("prepare_min_score", 60)))
-    path = write_digest(store)
-    print(f"\nDigest: {path}")
-    return 0
 
 
 def write_digest(store: Store) -> Path:
@@ -938,12 +959,10 @@ def sync(cfg: dict, store: Store) -> int:
     if not url or not token:
         print(f"\n(Sheet not configured: {len(rows)} row(s) queued in data/jobs.db; see README step 2.)")
         return 0
-    # Only qualified jobs go to the sheet: anything past "New", or New with a good enough score.
-    # Jobs skipped/unqualified before they ever reached the sheet stay local-only.
-    min_score = cfg.get("find", {}).get("sheet_min_score", 60)
+    # Only jobs you kept go to the sheet (anything past "New", except Skipped). New and skipped jobs
+    # stay local-only; rows already in the sheet keep getting their updates (e.g. -> Submitted).
     def qualified(r):
-        score = r["ai_score"] if r["ai_score"] is not None else r["score"]
-        return r["status"] not in ("New", "Skipped") or (score is not None and score >= min_score)
+        return r["status"] not in ("New", "Skipped")
     local_only = [r for r in rows if not r["in_sheet"] and not qualified(r)]
     local_keys = {r["key"] for r in local_only}
     rows = [r for r in rows if r["key"] not in local_keys]
@@ -1044,7 +1063,13 @@ def main() -> int:
     asx.add_argument("--why")
     asx.add_argument("--missing")
     asx.set_defaults(fn=cmd_assess)
-    sub.add_parser("find", help="everything for 'find jobs': pull, all sources + Gmail, clean, score, prepare, compact summary").set_defaults(fn=cmd_find)
+    sub.add_parser("find", help="everything for 'find jobs': pull, all sources + Gmail, clean, score, list jobs to review").set_defaults(fn=cmd_find)
+    pk = sub.add_parser("pick", help="your choice after review: keep these keys (-> Approved, sheet); the rest are skipped")
+    pk.add_argument("keys", nargs="*")
+    pk.set_defaults(fn=cmd_pick)
+    nx = sub.add_parser("next", help="the next job to apply to, with link, CV and answers")
+    nx.add_argument("ref", nargs="?")
+    nx.set_defaults(fn=cmd_next)
     sub.add_parser("daily", help="alias of find").set_defaults(fn=cmd_find)
     b = sub.add_parser("build", help="tailor.json -> cv.html (base-CV design) -> finalize")
     b.add_argument("refs", nargs="+")

@@ -68,8 +68,8 @@ class AssessHelpersTest(unittest.TestCase):
             load_assessments(p)
 
 
-class AssessCommandTest(unittest.TestCase):
-    def test_strong_prepared_middle_kept_weak_skipped(self):
+class AssessAndPickTest(unittest.TestCase):
+    def test_assess_records_only_then_your_pick_decides(self):
         store = cli.open_store()
         strong, mid, weak = (stored(store, c) for c in ("StrongCo", "MidCo", "WeakCo"))
         f = Path(tempfile.mkdtemp()) / "a.json"
@@ -77,14 +77,22 @@ class AssessCommandTest(unittest.TestCase):
             {"key": strong, "score": 88, "why": "Exact Flutter + BLoC match in Dubai.", "missing": "GraphQL"},
             {"key": mid, "score": 68, "why": "Good stack, but lead role.", "missing": "8+ yrs"},
             {"key": weak, "score": 40, "why": "Mostly native iOS.", "missing": "Swift"}]))
-        with mock.patch.object(cli, "sync", return_value=0):
+        with mock.patch.object(cli, "sync", return_value=0) as sync, mock.patch("builtins.print"):
             cli.cmd_assess(mock.Mock(file=str(f)))
+            self.assertFalse(sync.called)                      # nothing reaches the sheet before you pick
+            s = cli.open_store()
+            self.assertEqual({s.get(k)["status"] for k in (strong, mid, weak)}, {"New"})
+            self.assertEqual((s.get(strong)["ai_score"], s.get(strong)["missing"]), (88, "GraphQL"))
+            cli.cmd_pick(mock.Mock(keys=[strong[:8], weak]))  # you keep one I'd have skipped, drop one I'd keep
+            self.assertTrue(sync.called)
         s = cli.open_store()
-        self.assertEqual(s.get(strong)["status"], "Tailoring")
-        self.assertTrue((Path(s.get(strong)["cv_dir"]) / "jd.txt").exists())
-        self.assertEqual((s.get(strong)["ai_score"], s.get(strong)["missing"]), (88, "GraphQL"))
-        self.assertEqual(s.get(mid)["status"], "New")
-        self.assertEqual(s.get(weak)["status"], "Skipped")
+        self.assertEqual([s.get(k)["status"] for k in (strong, mid, weak)], ["Approved", "Skipped", "Approved"])
+        self.assertIn("you skipped it", s.get(mid)["notes"])
+
+    def test_tailoring_at_apply_time_keeps_approved(self):
+        self.assertEqual(cli._forward("Approved", "Tailoring"), "Approved")
+        self.assertEqual(cli._forward("Approved", "Ready"), "Approved")
+        self.assertEqual(cli._forward("New", "Tailoring"), "Tailoring")
 
 
 class ApprovalGateTest(unittest.TestCase):
@@ -119,6 +127,30 @@ class OutcomeTest(unittest.TestCase):
         self.assertEqual(self.outcome("f", "500 error")["status"], "Failed")
         self.assertEqual(self.outcome("l")["status"], "Pending")
         self.assertEqual(self.outcome("q", manual=True)["status"], "Manual action required")
+
+
+class BotCheckTest(unittest.TestCase):
+    def test_security_check_goes_to_your_browser_as_manual(self):
+        from jobpilot.apply import runner as real
+        store = cli.open_store()
+        key = stored(store, "CheckCo", status="Approved")
+        tmp = Path(tempfile.mkdtemp())
+        (tmp / "job.json").write_text(json.dumps({"label": "CheckCo - Senior Flutter Developer"}))
+        (tmp / "cv.pdf").write_bytes(b"%PDF")
+        store.update(key, cv_dir=str(tmp), cv_pdf=str(tmp / "cv.pdf"))
+        store.commit()
+        runner = mock.Mock(open_only=real.open_only, site_name=real.site_name, RestrictedSite=real.RestrictedSite,
+                           application_url=lambda u, a: "https://ae.jooble.org/jdp/1", ats_of=lambda u: "other",
+                           open_form=lambda page, url: [], _has_form=lambda f: False, is_bot_check=lambda page: True,
+                           load_answers=lambda d, g: {})
+        page = mock.Mock(url="about:blank")
+        with mock.patch.object(cli, "sync", return_value=0), mock.patch.object(cli, "_open_in_default_browser") as op, \
+                mock.patch.object(cli, "_copy_to_clipboard"), mock.patch.object(cli, "_ask", return_value="l"), \
+                mock.patch("builtins.print"):
+            cli.apply_one(store, store.get(key), page, runner, {}, {}, plan_only=False)
+        op.assert_called_once_with("https://ae.jooble.org/jdp/1")
+        runner.wait_for_form.assert_not_called()          # no waiting on a check the automated browser can't pass
+        self.assertEqual(cli.open_store().get(key)["status"], "Manual action required")
 
 
 if __name__ == "__main__":

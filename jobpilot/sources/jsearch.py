@@ -10,19 +10,16 @@ one request per query per run: 3 queries/day ≈ 90/month.
 """
 from __future__ import annotations
 
-import re
 import urllib.parse
 
 from ..http import get_json
 from ..models import Job
+from ..sites import is_aggregator, rank
 from ..text import clean_location, parse_date
 
 OWN_URL = "https://api.openwebninja.com/jsearch/search-v2"
 RAPID_HOST = "jsearch.p.rapidapi.com"
 
-# Application links we can pre-fill in step 3, best first.
-_ATS = re.compile(r"greenhouse\.io|jobs\.lever\.co|ashbyhq\.com|apply\.workable\.com|smartrecruiters\.com", re.I)
-_OPEN_ONLY = re.compile(r"linkedin\.com|indeed\.|glassdoor\.|bayt\.com|naukrigulf\.com", re.I)
 
 
 # Used when JSearch leaves a job's location blank but the search was country-scoped.
@@ -75,6 +72,8 @@ def parse(resp, default_country: str | None = None) -> list[Job]:
     for j in items:
         loc = ", ".join(x for x in (j.get("job_city"), j.get("job_state"), j.get("job_country")) if x)
         apply = best_apply_link(j)
+        if not apply:  # only reachable through re-posting aggregators
+            continue
         jobs.append(Job(
             source=f"jsearch:{(j.get('job_publisher') or '').lower()}",
             title=j.get("job_title", ""),
@@ -100,16 +99,13 @@ def _with_country(location: str, country: str | None) -> str:
 
 
 def best_apply_link(j: dict) -> str:
-    """Prefer the employer's own ATS form (pre-fillable), then any direct
-    link, then anything that isn't a ToS-restricted board, then the default."""
-    options = [o for o in (j.get("apply_options") or []) if o.get("apply_link")]
-    default = j.get("job_apply_link", "") or ""
-    for pick in (
-        lambda o: _ATS.search(o["apply_link"]),
-        lambda o: o.get("is_direct"),
-        lambda o: not _OPEN_ONLY.search(o["apply_link"]),
-    ):
-        for o in options:
-            if pick(o):
-                return o["apply_link"]
-    return default
+    """The best place to apply (see sites.rank): the employer's own no-account form, then
+    their careers site, then a platform you have an account on. Direct links win ties.
+    Empty when every option is a re-posting aggregator: those jobs are dropped."""
+    options = [(o["apply_link"], bool(o.get("is_direct"))) for o in (j.get("apply_options") or []) if o.get("apply_link")]
+    if j.get("job_apply_link"):
+        options.append((j["job_apply_link"], bool(j.get("job_apply_is_direct"))))
+    options = [o for o in options if not is_aggregator(o[0])]
+    if not options:
+        return ""
+    return min(options, key=lambda o: (rank(o[0]), not o[1]))[0]

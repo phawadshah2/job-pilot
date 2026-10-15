@@ -221,10 +221,10 @@ def s_where(user: dict, regions_catalog: dict) -> None:
     else:
         s["salary_floor"] = None
     s["us_citizen"] = ask_yes("Are you a US citizen? (else 'US citizens only' jobs are skipped)", s.get("us_citizen", False))
-    if ask_yes("Add company career boards to watch? (Greenhouse/Lever/Ashby/Workable/SmartRecruiters slugs)",
+    if ask_yes("Add company career boards to watch? (Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Recruitee/Teamtailor/Breezy slugs)",
                any(s.get("companies", {}).values())):
         comp = s.setdefault("companies", {})
-        for ats in ("greenhouse", "lever", "ashby", "workable", "smartrecruiters"):
+        for ats in ("greenhouse", "lever", "ashby", "workable", "smartrecruiters", "recruitee", "teamtailor", "breezy"):
             comp[ats] = ask_list(f"  {ats} slugs", comp.get(ats, []))
 
 
