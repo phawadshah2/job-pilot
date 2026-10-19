@@ -44,7 +44,7 @@ SITES: list[tuple[str, str, str]] = [
     ("account", "Glassdoor", r"(^|\.)glassdoor\.[a-z.]+$"),
     ("account", "Dice", r"(^|\.)dice\.com$"),
     ("account", "Reed", r"(^|\.)reed\.co\.uk$"),
-    ("account", "SEEK", r"(^|\.)seek\.com\.au$"),
+    ("account", "SEEK", r"(^|\.)seek\.com(\.au)?$"),
     # one account per company
     ("portal", "Workday", r"myworkdayjobs\.com$|myworkdaysite\.com$|workday\.com$"),
     ("portal", "SuccessFactors", r"successfactors\.(com|eu)$|^jobs\.sap\.com$|sapsf\.(com|eu)$"),
@@ -67,14 +67,17 @@ SITES: list[tuple[str, str, str]] = [
                                  r"expatriates\.com|grabjobs\.co|jobzmall\.com|tealhq\.com|"
                                  r"jobsinkuwait\.com|gulfjobs\.[a-z.]+|bossjob\.[a-z.]+|uaejobs\.[a-z.]+|"
                                  r"khaleejtimes\.com|jobs\.ae|careers24\.com|drjobpro\.com|hirelateral\.com|"
-                                 r"clickajobs\.com|jobisite\.com|virtualvocations\.com|flexjobs\.com|jaabz\.com)$"),
+                                 r"clickajobs\.com|jobisite\.com|virtualvocations\.com|flexjobs\.com|jaabz\.com|jobaaj\.com)$"),
 ]
 _COMPILED = [(k, n, re.compile(p, re.I)) for k, n, p in SITES]
 
 # Links in alert emails go through click trackers; these are followed to the real job page.
 TRACKERS = re.compile(r"(^|\.)(sendgrid\.net|links\.wellfound\.com|sendibt\d*\.com|mailchimp\.com|"
                       r"list-manage\.com|hubspotlinks\.com|mandrillapp\.com|click\.[a-z0-9-]+\.[a-z]+|"
-                      r"url\d+\.[a-z0-9-]+\.[a-z]+|r\.[a-z0-9.-]+)$", re.I)
+                      r"url\d+\.[a-z0-9-]+\.[a-z]+|r\.[a-z0-9.-]+|"
+                      # job platforms' own click trackers
+                      r"email\.s\.seek\.com\.au|click\.email\.seek\.com\.au|clicks\.reed\.co\.uk|"
+                      r"elinks\.dice\.com|cts\.indeed\.com|click\.[a-z0-9-]+\.[a-z0-9-]+\.[a-z.]+)$", re.I)
 
 
 def host(url: str) -> str:

@@ -76,7 +76,14 @@ Every job's link is sorted (`jobpilot/sites.py`) and shown in the sheet's **Appl
 | Aggregator | Jooble, JobLeads, Trabajo, beBee, Jobrapido, Upwork, ... | Dropped |
 
 Platforms without a public feed (Bayt, Wellfound, ...) come in through their **job-alert emails**:
-turn alerts on, sent to the Gmail that job-pilot reads.
+turn alerts on, sent to the Gmail that job-pilot reads. Only **unread** alerts from the last 7 days are
+read (every job in the email, not the "see all jobs" page behind it); emails with jobs are then marked
+read, others stay unread.
+
+Remote jobs listed for a country you don't live in (`home_country`) are dropped when the title or JD
+spells out a residency rule ("[US]", "must be based in", "authorized to work in", "Remote (India)"...),
+unless it also says worldwide / your region. A board's location label alone only adds a
+"check it's open to you" note.
 
 ## What's automated, and what never is
 - **Never automated:** clicking Submit; job platforms you sign in to and per-company account portals

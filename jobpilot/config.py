@@ -108,6 +108,10 @@ def build(defaults: dict, user: dict, env: dict) -> dict:
         "title_exclude_any": f["title_exclude_any"] + [t for t in role.get("exclude_titles", []) if t],
         "title_exclude_unless_keyword": role.get("competing_stacks", []) or ["__none__"],
         "remote_regions_ok": search.get("remote_ok", []) or ["__none__"],
+        # Remote jobs limited to one of these regions are open to you (you live there). Without a
+        # home country every region counts, as before.
+        "remote_home_regions": [r for r in regions if not search.get("home_country") or any(
+            p.get("country") == search["home_country"] for p in catalog[r]["jsearch"])],
         "regions": regions,
         "dealbreakers": deal,
         "dealbreakers_onsite_only": ["based outside target countries"],

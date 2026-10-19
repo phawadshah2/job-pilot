@@ -63,9 +63,20 @@ class FilterTest(unittest.TestCase):
         self.assertEqual(self.keep(job("Flutter Developer", "Remote", True)).work_mode, "remote-worldwide")
         self.assertEqual(self.keep(job("Flutter Developer", "", True)).work_mode, "remote-worldwide")
 
-    def test_remote_restricted_to_target_region_kept_elsewhere_dropped(self):
-        j = self.keep(job("Senior Flutter Developer", "Remote - US", True))
-        self.assertEqual((j.work_mode, j.region), ("remote-region", "us"))
+    def test_remote_limited_to_another_country_is_dropped_unless_open_to_you(self):
+        # the example user lives in the UAE: a US-remote job that spells out residency is dropped
+        self.drop(job("Senior Flutter Developer", "Remote - US", True, desc="Flutter. Must be based in the US."),
+                  "residents only (Must be based in)")
+        self.drop(job("[US] Senior Flutter Developer", "United States", True), "residents only ([US])")
+        unclear = self.keep(job("Senior Flutter Developer", "United States", True))   # a board's label only
+        self.assertIn("listed as US-remote: check it's open to you", unclear.notes)
+        anywhere = job("Senior Flutter Developer", "United States", True)
+        anywhere.description = "Remote job with the freedom to work from anywhere in the world."
+        self.assertEqual((self.keep(anywhere).work_mode, anywhere.region), ("remote-region", "us"))
+        mena = job("Senior Flutter Developer", "Remote - UK", True)
+        mena.description = "We hire across EMEA."
+        self.keep(mena)
+        self.assertEqual(self.keep(job("Senior Flutter Developer", "Remote - Dubai", True)).region, "uae")
         self.drop(job("Senior Flutter Developer", "Poland", True), "restricted")
 
     def test_remote_region_ok(self):

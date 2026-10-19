@@ -74,6 +74,21 @@ class MessageRoutingTest(unittest.TestCase):
         _, jobs = parse_message(m.as_bytes())
         self.assertEqual(jobs[0].url, "https://www.linkedin.com/jobs/view/123/")
 
+    def test_indeed_sponsored_link_without_job_id(self):
+        text = ("Indeed Job Alert\n1 new flutter developer vacancy in UAE\n\n"
+                "Flutter Developer\nAcme - Dubai\nAED12,000 a month\nEasily apply\nBuild our app.\n3 days ago\n"
+                "https://ae.indeed.com/pagead/clk/dl?mo=r&ad=abc123\n")
+        jobs = parse_indeed(text)
+        self.assertEqual([(j.title, j.company, j.location) for j in jobs], [("Flutter Developer", "Acme", "Dubai")])
+        self.assertEqual(jobs[0].url, "https://ae.indeed.com/pagead/clk/dl?mo=r&ad=abc123")
+
+    def test_seek_tracker_links_resolve_to_new_domain(self):
+        html = ("<a href='https://email.s.seek.com.au/uni/ss/c/u001.abc'><span>Flutter Developer</span>"
+                "<span>Acme</span><span>Sydney NSW (Hybrid)</span><span>Recently posted</span></a>")
+        _, jobs = parse_message(self.mail("SEEK <noreply@s.seek.com.au>", "", html),
+                                resolver=lambda u: "https://au.seek.com/job/95278039?token=x")
+        self.assertEqual((jobs[0].source, jobs[0].url), ("email:seek", "https://au.seek.com/job/95278039"))
+
 
 if __name__ == "__main__":
     unittest.main()
