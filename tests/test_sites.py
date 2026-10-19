@@ -19,7 +19,9 @@ class SitesTest(unittest.TestCase):
             "https://acme.wd3.myworkdayjobs.com/en-US/careers/job/1": "portal",
             "https://career5.successfactors.eu/careers?company=x": "portal",
             "https://himalayas.app/companies/x/jobs/y": "board",
+            "https://au.seek.com/job/95278039": "account",
             "https://ae.jooble.org/jdp/1": "aggregator",
+            "https://www.jobaaj.com/job/x-1": "aggregator",
             "https://www.jobleads.com/ae/job/x": "aggregator",
             "https://www.upwork.com/freelance-jobs/apply/x": "aggregator",
         }

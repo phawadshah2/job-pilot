@@ -30,6 +30,19 @@ class Filter:
         # Ordered target regions (highest priority first). Each: {"points": int, "patterns": [...]}.
         self.regions = [(name, _rx(r["patterns"]), r["points"]) for name, r in f["regions"].items()]
         self.remote_ok = _rx(f["remote_regions_ok"])
+        self.home_regions = set(f.get("remote_home_regions", [r for r in f["regions"]]))
+        home_words = [w for r in self.home_regions for w in f["regions"][r]["patterns"]]
+        # A remote job listed for another country is still open to you when the title/JD says so.
+        self.open_to_you = re.compile(
+            r"\b(work(ing)? from anywhere|anywhere in the world|remote[- ]?worldwide|hire worldwide|from any country|"
+            r"any location|fully distributed|globally remote|emea|mena|middle east|gcc|gulf"
+            + "".join("|" + re.escape(w) for w in home_words) + r")\b", re.I)
+        # ...and closed when they spell out a residency rule (a board's location label alone isn't enough).
+        self.residents_only = re.compile(
+            r"(\[(us|usa|uk|au)\]|\b(us|usa|uk|u\.s\.)[- ]only\b|\b(must|need to|required to) (be )?(based|located|resid\w*) in\b"
+            r"|\bresidents? of\b|\bauthori[sz]ed to work in\b|\bwork authori[sz]ation\b|\bright to work in\b"
+            r"|\bremote\s*\((united states|us|usa|uk|united kingdom|india|australia|canada|colombia|nigeria|philippines)\)"
+            r"|\bremote (with)?in the (united states|us|uk)\b|\b(us|uk)[- ]based\b|\b(must|should) be (us|uk)[- ]based\b)", re.I)
         self.worldwide = _rx(f["worldwide_markers"])
         self.max_age = timedelta(days=f["max_age_days"])
         self.drop_unspecified_seniority = f.get("drop_unspecified_seniority", False)
@@ -138,6 +151,12 @@ class Filter:
             if not rest or self.worldwide.search(loc):
                 job.work_mode, job.region = "remote-worldwide", "remote"
             elif region:
+                text = f"{title}\n{job.description or ''}"
+                if region not in self.home_regions and not self.open_to_you.search(text):
+                    limit = self.residents_only.search(text)
+                    if limit:
+                        return f"remote, residents only ({limit.group(0).strip()[:30]})"
+                    job.notes.append(f"listed as {region.upper()}-remote: check it's open to you")
                 job.work_mode, job.region = "remote-region", region
             elif self.remote_ok.search(loc):
                 job.work_mode, job.region = "remote-region", "remote"

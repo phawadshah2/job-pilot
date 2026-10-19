@@ -31,15 +31,17 @@ IMAP_HOST = "imap.gmail.com"
 
 def parse_indeed(text: str) -> list[Job]:
     """Blocks separated by blank lines: title / 'Company - Location' / [salary] / [Easily apply] /
-    snippet... / age / https://<cc>.indeed.com/rc/clk/dl?jk=<id>&..."""
+    snippet... / age / https://<cc>.indeed.com/rc/clk/dl?jk=<id>&... (or a sponsored /pagead/clk link
+    without a job id, kept as is: it redirects to the job)."""
     jobs = []
     for block in re.split(r"\n\s*\n", text):
         lines = [l.strip() for l in block.strip().splitlines() if l.strip()]
-        url_line = next((l for l in lines if "indeed.com/" in l and "jk=" in l), None)
+        url_line = next((l for l in lines if re.search(r"indeed\.com/\S*(jk=|/clk)", l)), None)
         if not url_line or len(lines) < 3:
             continue
         m = re.search(r"https?://(\w+)\.indeed\.com/\S*?[?&]jk=([0-9a-f]+)", url_line)
-        if not m:
+        sponsored = re.search(r"https?://\w+\.indeed\.com/\S+", url_line)
+        if not m and not sponsored:
             continue
         title, comp_loc = lines[0], lines[1]
         company, _, location = comp_loc.rpartition(" - ")
@@ -51,7 +53,7 @@ def parse_indeed(text: str) -> list[Job]:
                            and not re.match(r"^(\d+\+? days? ago|just posted|today|new)$", l, re.I))
         jobs.append(Job(
             source="email:indeed", title=title, company=company.strip(), location=location.strip(),
-            url=f"https://{m[1]}.indeed.com/viewjob?jk={m[2]}",
+            url=f"https://{m[1]}.indeed.com/viewjob?jk={m[2]}" if m else sponsored[0],
             remote=bool(re.search(r"\bremote\b", location, re.I)) or None,
             description=(f"{salary}. " if salary else "") + snippet, salary=salary,
         ))
@@ -92,7 +94,7 @@ JOB_PAGES = {
     "Glassdoor": r"glassdoor\.[a-z.]+/(job-listing/|partner/jobListing)",
     "Dice": r"dice\.com/job-detail/",
     "Reed": r"reed\.co\.uk/jobs/[^/]+/\d+",
-    "SEEK": r"seek\.com\.au/job/\d+",
+    "SEEK": r"seek\.com(\.au)?/job/\d+",
 }
 _JOB_PAGES = {name: re.compile(r"(?:[a-z0-9-]+\.)*(?:" + rx + ")", re.I) for name, rx in JOB_PAGES.items()}
 # Words in link text that are never a title, company or location.

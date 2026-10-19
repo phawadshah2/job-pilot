@@ -38,7 +38,8 @@ fit and work rights, must-haves met. Statuses don't change; ≥ `find.keep_min_s
 ## 4. Let the user pick (in chat)
 Show **every reviewed job** in one selectable list (the chat widget: a checkbox per job; suggested
 keeps pre-ticked, suggested skips unticked with the reason). Per job: company, role, location, Apply via,
-salary, score, why, missing. One button sends the choice back as `keep: <key> <key> ...`.
+salary, score, why, missing, and the "check it's open to you" note when a remote job is only labelled
+for another country. One button sends the choice back as `keep: <key> <key> ...`.
 If no widget is available, a numbered list and "reply with the numbers to keep".
 
 ## 5. (stop) Wait for the user's choice, then
