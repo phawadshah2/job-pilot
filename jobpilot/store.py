@@ -19,6 +19,14 @@ CREATE TABLE IF NOT EXISTS jobs (
     status       TEXT NOT NULL DEFAULT 'New',
     synced       INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS inbox (
+    msg_id   TEXT PRIMARY KEY,           -- email Message-ID: each reply is proposed once
+    key      TEXT NOT NULL,              -- the application it is about
+    kind     TEXT NOT NULL,              -- interview | assessment | rejected | offer | received
+    subject  TEXT, sender TEXT, sent TEXT, evidence TEXT,
+    state    TEXT NOT NULL DEFAULT 'pending',   -- pending | applied | dismissed
+    seen_at  TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS api_usage (
     api   TEXT NOT NULL,
     day   TEXT NOT NULL,
