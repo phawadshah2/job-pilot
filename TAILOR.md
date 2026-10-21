@@ -52,7 +52,10 @@ the CV (finalize checks it for skills they don't have).
 4. **Experience**: order bullets by relevance and reword with the JD's vocabulary; no new achievements.
 5. **Projects**: most relevant first.
 
-Then `python3 -m jobpilot build <key>`. Rebuilding keeps the previous PDFs in `versions/`. Aim for ≥ 80% coverage of the BRIEF keywords; the rest
+Then `python3 -m jobpilot build <key>`. It ends with a **reviewer pass** (`jobpilot critique <key>`):
+`[fix]` = a JD keyword they have but the CV omits, or a number not in facts.md / the JD (fix and
+rebuild); `[consider]` = generic opener, cliché, long summary, repeated phrase, company named only in
+the greeting (say why them); `[gap]` = never add it, prepare an honest answer. Rebuilding keeps the previous PDFs in `versions/`. Aim for ≥ 80% coverage of the BRIEF keywords; the rest
 should be genuine gaps.
 
 ## Report

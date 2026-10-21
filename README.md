@@ -57,7 +57,10 @@ python3 -m jobpilot pick <keep keys>...     # your choice: kept -> Approved + sh
 python3 -m jobpilot next                    # the next job to apply to
 python3 -m jobpilot prepare <key>           # job folder for tailoring
 python3 -m jobpilot build <key>             # tailor.json -> CV (+ cover letter) PDFs
+python3 -m jobpilot critique <key>          # reviewer pass (also runs after build)
 python3 -m jobpilot status <key> Submitted  # after you applied (or Pending / Failed / Skipped)
+python3 -m jobpilot inbox                   # replies from companies -> proposals; --apply / --dismiss <ids>
+python3 -m jobpilot prep <key> [--pdf]      # interview prep pack (INTERVIEW.md) once you're shortlisted
 python3 -m jobpilot followups               # applications due for a follow-up
 python3 -m jobpilot sheet-reset             # empty the Google Sheet (asks first)
 ```
