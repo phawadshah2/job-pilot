@@ -61,7 +61,10 @@ again). Reply with the kept list and "say **apply** to start, one job at a time"
 ```bash
 python3 -m jobpilot next          # the next Approved/Pending job: link, Apply via, salary, score, answers
 ```
-Then tailor it (CVs are made only now, one at a time):
+**Show the job link and stop.** The user opens the posting and reads it first, then replies
+**"tailor"** (or "tailor + cover letter" / other application requirements) or **"skip"** (`status <key>
+Skipped`, then `next`). Do not run `prepare` or `build` before they say so.
+After "tailor", tailor it (CVs are made only now, one at a time):
 ```bash
 python3 -m jobpilot prepare <key>  # job folder with jd.txt, BRIEF.md
 ```
